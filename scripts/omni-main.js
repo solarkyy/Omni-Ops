@@ -36,14 +36,19 @@ const ModuleLoader = {
             this.updateStatus(`Loading ${module.name}...`);
             const script = document.createElement('script');
             script.src = module.file;
+            script.async = false;
+            script.type = 'text/javascript';
             script.onload = () => {
                 if (module.required) this.loaded++;
                 this.updateModuleStatus(module.name, 'loaded');
                 this.updateProgress();
                 index++;
+                console.log(`[ModuleLoader] Successfully loaded: ${module.name}`);
                 setTimeout(loadNext, 100);
             };
-            script.onerror = () => {
+            script.onerror = (e) => {
+                const err = `Failed to load ${module.name}: ${module.file}`;
+                console.error(err, e);
                 console.warn(`Failed to load ${module.name}`);
                 this.updateModuleStatus(module.name, 'failed');
                 index++;
