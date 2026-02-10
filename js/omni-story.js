@@ -377,9 +377,13 @@
             this.introPhase = 0;
             this.introTimer = 0;
 
-            document.getElementById('menu-overlay').style.display = 'none';
-            document.getElementById('story-intro').style.display = 'flex';
-            document.getElementById('story-intro').style.opacity = '1';
+            const menuOverlay = document.getElementById('menu-overlay');
+            const storyIntro = document.getElementById('story-intro');
+            if (menuOverlay) menuOverlay.style.display = 'none';
+            if (storyIntro) {
+                storyIntro.style.display = 'flex';
+                storyIntro.style.opacity = '1';
+            }
 
             // Input handling
             document.addEventListener('keydown', (e) => {
@@ -430,12 +434,14 @@
             // Background color transition
             const bgColor = phase.bgColor || 0x000000;
             const bgColorHex = '#' + bgColor.toString(16).padStart(6, '0');
-            document.getElementById('story-intro').style.background = bgColorHex;
+            const storyIntro = document.getElementById('story-intro');
+            if (storyIntro) storyIntro.style.background = bgColorHex;
 
             // Camera simulation (text animation)
             if (phase.effect === 'fade_in') {
                 const alpha = Math.min(1, this.introTimer / 1);
-                document.getElementById('story-intro-content').style.opacity = alpha;
+                const introContent = document.getElementById('story-intro-content');
+                if (introContent) introContent.style.opacity = alpha;
             } else if (phase.effect === 'pan_slow') {
                 const offset = (this.introTimer * 5) % 20;
                 narrationEl.style.opacity = 0.9;

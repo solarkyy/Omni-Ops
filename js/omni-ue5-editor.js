@@ -1037,36 +1037,44 @@
 
         // ========== FILE OPERATIONS ==========
         save() {
-            const data = {
-                objects: this.objects.map(o => ({
-                    type: o.userData.type,
-                    pos: { x: o.position.x, y: o.position.y, z: o.position.z },
-                    rot: { x: o.rotation.x, y: o.rotation.y, z: o.rotation.z },
-                    scale: { x: o.scale.x, y: o.scale.y, z: o.scale.z }
-                }))
-            };
-            localStorage.setItem('ue5_level_data', JSON.stringify(data));
-            console.log('[Editor] Saved', this.objects.length, 'objects');
+            try {
+                const data = {
+                    objects: this.objects.map(o => ({
+                        type: o.userData.type,
+                        pos: { x: o.position.x, y: o.position.y, z: o.position.z },
+                        rot: { x: o.rotation.x, y: o.rotation.y, z: o.rotation.z },
+                        scale: { x: o.scale.x, y: o.scale.y, z: o.scale.z }
+                    }))
+                };
+                localStorage.setItem('ue5_level_data', JSON.stringify(data));
+                console.log('[Editor] Saved', this.objects.length, 'objects');
+            } catch(e) {
+                console.error('[Editor] Failed to save level data:', e);
+            }
         },
 
         load() {
-            const saved = localStorage.getItem('ue5_level_data');
-            if (!saved) {
-                console.log('[Editor] No save data');
-                return;
+            try {
+                const saved = localStorage.getItem('ue5_level_data');
+                if (!saved) {
+                    console.log('[Editor] No save data');
+                    return;
+                }
+
+                const data = JSON.parse(saved);
+                this.clear();
+                
+                data.objects.forEach(objData => {
+                    this.spawnObject(objData.type, new THREE.Vector3(objData.pos.x, objData.pos.y, objData.pos.z));
+                    const obj = this.objects[this.objects.length - 1];
+                    obj.rotation.set(objData.rot.x, objData.rot.y, objData.rot.z);
+                    obj.scale.set(objData.scale.x, objData.scale.y, objData.scale.z);
+                });
+
+                console.log('[Editor] Loaded', this.objects.length, 'objects');
+            } catch(e) {
+                console.error('[Editor] Failed to load level data:', e);
             }
-
-            const data = JSON.parse(saved);
-            this.clear();
-            
-            data.objects.forEach(objData => {
-                this.spawnObject(objData.type, new THREE.Vector3(objData.pos.x, objData.pos.y, objData.pos.z));
-                const obj = this.objects[this.objects.length - 1];
-                obj.rotation.set(objData.rot.x, objData.rot.y, objData.rot.z);
-                obj.scale.set(objData.scale.x, objData.scale.y, objData.scale.z);
-            });
-
-            console.log('[Editor] Loaded', this.objects.length, 'objects');
         },
 
         clear() {

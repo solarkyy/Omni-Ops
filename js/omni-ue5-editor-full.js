@@ -858,19 +858,24 @@
                     scale: { x: o.scale.x, y: o.scale.y, z: o.scale.z }
                 }))
             };
-            localStorage.setItem('ue5_level_data', JSON.stringify(data));
-            console.log('[Editor] Saved', this.objects.length, 'objects');
+            try {
+                localStorage.setItem('ue5_level_data', JSON.stringify(data));
+                console.log('[Editor] Saved', this.objects.length, 'objects');
+            } catch(e) {
+                console.error('[Editor] Failed to save level data:', e);
+            }
         },
 
         load() {
-            const saved = localStorage.getItem('ue5_level_data');
-            if (!saved) {
-                console.log('[Editor] No save data');
-                return;
-            }
+            try {
+                const saved = localStorage.getItem('ue5_level_data');
+                if (!saved) {
+                    console.log('[Editor] No save data');
+                    return;
+                }
 
-            const data = JSON.parse(saved);
-            this.clear();
+                const data = JSON.parse(saved);
+                this.clear();
             
             data.objects.forEach(objData => {
                 this.spawnObject(objData.type, new THREE.Vector3(objData.pos.x, objData.pos.y, objData.pos.z));
@@ -880,6 +885,9 @@
             });
 
             console.log('[Editor] Loaded', this.objects.length, 'objects');
+            } catch(e) {
+                console.error('[Editor] Failed to load level data:', e);
+            }
         },
 
         clear() {

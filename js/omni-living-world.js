@@ -121,6 +121,7 @@
         currentHour: 12,
         currentDay: 0,
         worldState: {},
+        dayNightCycleInterval: null,
 
         init: function() {
             console.log('[Living World] Initializing...');
@@ -322,7 +323,9 @@
         },
 
         startDayNightCycle: function() {
-            setInterval(() => {
+            if (this.dayNightCycleInterval) return; // Already running
+            
+            this.dayNightCycleInterval = setInterval(() => {
                 this.currentHour = (this.currentHour + 1) % 24;
                 if (this.currentHour === 0) this.currentDay++;
 
@@ -338,6 +341,13 @@
                     clockEl.innerText = h + ':' + m;
                 }
             }, 3000); // 3 seconds = 1 hour in game
+        },
+
+        stopDayNightCycle: function() {
+            if (this.dayNightCycleInterval) {
+                clearInterval(this.dayNightCycleInterval);
+                this.dayNightCycleInterval = null;
+            }
         },
 
         updateDayNightLighting: function() {

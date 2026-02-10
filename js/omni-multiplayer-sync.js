@@ -136,13 +136,15 @@
         applyFullWorldState(worldState) {
             console.log('[MultiplayerSync] Applying full world state sync');
             
-            if (worldState.seed && !window.gameState.seedLocked) {
-                window.gameState.worldSeed = worldState.seed;
-                window.gameState.seedLocked = true;
+            if (window.gameState) {
+                if (worldState.seed && !window.gameState.seedLocked) {
+                    window.gameState.worldSeed = worldState.seed;
+                    window.gameState.seedLocked = true;
+                }
+                
+                window.gameState.timeOfDay = worldState.timeOfDay;
+                window.gameState.reputation = worldState.reputation;
             }
-            
-            window.gameState.timeOfDay = worldState.timeOfDay;
-            window.gameState.reputation = worldState.reputation;
 
             // Update all entities
             Object.entries(worldState.entities || {}).forEach(([id, entity]) => {

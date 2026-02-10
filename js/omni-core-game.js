@@ -96,18 +96,26 @@ function loadWorldData() {
 }
 function saveWorldData() {
     if (!isGameActive) return;
-    const saveObj = {
-        reputation: gameState.reputation,
-        ammo: player.ammo,
-        reserveAmmo: player.reserveAmmo,
-        pos: { x: cameraRig ? cameraRig.position.x : 0, y: cameraRig ? cameraRig.position.y : 0, z: cameraRig ? cameraRig.position.z : 0 }
-    };
-    localStorage.setItem('omni_ops_save_v7', JSON.stringify(saveObj));
+    try {
+        const saveObj = {
+            reputation: gameState.reputation,
+            ammo: player.ammo,
+            reserveAmmo: player.reserveAmmo,
+            pos: { x: cameraRig ? cameraRig.position.x : 0, y: cameraRig ? cameraRig.position.y : 0, z: cameraRig ? cameraRig.position.z : 0 }
+        };
+        localStorage.setItem('omni_ops_save_v7', JSON.stringify(saveObj));
+    } catch(e) {
+        console.error('[Save] Failed to save game data:', e);
+    }
 }
 setInterval(saveWorldData, 60000); 
 
 function saveSession(roomId) {
-    localStorage.setItem('omni_session_room', roomId);
+    try {
+        localStorage.setItem('omni_session_room', roomId);
+    } catch(e) {
+        console.error('[Session] Failed to save room ID:', e);
+    }
 }
 
 function clearSession() {
@@ -139,9 +147,14 @@ function initGame() {
         console.log('[initGame] Creating camera...');
         camera = new THREE.PerspectiveCamera(SETTINGS.FOV_BASE, window.innerWidth / window.innerHeight, 0.01, 1000);
         cameraRig = new THREE.Group();
-        const saved = JSON.parse(localStorage.getItem('omni_ops_save_v7') || '{}');
-        if (saved.pos) cameraRig.position.set(saved.pos.x, saved.pos.y, saved.pos.z);
-        else cameraRig.position.set((myPlayerIndex % 2) * 5, 0, (Math.floor(myPlayerIndex / 2)) * 5);
+        try {
+            const saved = JSON.parse(localStorage.getItem('omni_ops_save_v7') || '{}');
+            if (saved.pos) cameraRig.position.set(saved.pos.x, saved.pos.y, saved.pos.z);
+            else cameraRig.position.set((myPlayerIndex % 2) * 5, 0, (Math.floor(myPlayerIndex / 2)) * 5);
+        } catch(e) {
+            console.error('[Init] Failed to load saved position:', e);
+            cameraRig.position.set((myPlayerIndex % 2) * 5, 0, (Math.floor(myPlayerIndex / 2)) * 5);
+        }
         
         console.log('[initGame] Camera rig positioned at:', cameraRig.position);
         console.log('[initGame] Camera offset from rig:', camera.position);
@@ -328,19 +341,23 @@ function showScreen(screen) {
     if (screen === 'main') {
         const el = document.getElementById('main-screen'); if (el) el.style.display = 'block';
         // CHECK REJOIN
-        const savedRoom = localStorage.getItem('omni_session_room');
-        const resumeBtn = document.getElementById('btn-resume');
-        if (savedRoom && resumeBtn) {
-            resumeBtn.style.display = 'block';
-            resumeBtn.innerText = "▶️ Resume Game (" + savedRoom + ")";
-            resumeBtn.onclick = () => {
-                currentRoomId = savedRoom;
-                isHost = false;
-                isMultiplayer = true;
-                launchGame();
-            };
-        } else if(resumeBtn) {
-            resumeBtn.style.display = 'none';
+        try {
+            const savedRoom = localStorage.getItem('omni_session_room');
+            const resumeBtn = document.getElementById('btn-resume');
+            if (savedRoom && resumeBtn) {
+                resumeBtn.style.display = 'block';
+                resumeBtn.innerText = "▶️ Resume Game (" + savedRoom + ")";
+                resumeBtn.onclick = () => {
+                    currentRoomId = savedRoom;
+                    isHost = false;
+                    isMultiplayer = true;
+                    launchGame();
+                };
+            } else if(resumeBtn) {
+                resumeBtn.style.display = 'none';
+            }
+        } catch(e) {
+            console.error('[Session] Failed to check saved room:', e);
         }
     }
     if (screen === 'host') {
@@ -512,8 +529,10 @@ function startMatch() {
 }
 
 function updateHUDAmmo() {
-    document.getElementById('ammo-cur').innerText = player.ammo;
-    document.getElementById('ammo-res').innerText = player.reserveAmmo;
+    const ammoCur = document.getElementById('ammo-cur');
+    const ammoRes = document.getElementById('ammo-res');
+    if (ammoCur) ammoCur.innerText = player.ammo;
+    if (ammoRes) ammoRes.innerText = player.reserveAmmo;
 }
 
 function logMessage(msg) {
@@ -662,7 +681,8 @@ window.initializeUI = function() {
     if(resumeBtn) {
         resumeBtn.onclick = () => {
             console.log('[UI] btn-resume clicked');
-            document.getElementById('menu-overlay').style.display = 'none';
+            const menuOverlay = document.getElementById('menu-overlay');
+            if (menuOverlay) menuOverlay.style.display = 'none';
             safeRequestPointerLock();
         };
     }
@@ -745,9 +765,12 @@ function initPeer(host) {
             isMultiplayer = true;
             updateStatus("🟢 Host Ready - Waiting for players...");
             showScreen('lobby');
-            document.getElementById('lobby-room-code').innerText = "ROOM " + currentRoomId;
-            document.getElementById('lobby-host-controls').style.display = 'block';
-            document.getElementById('lobby-client-controls').style.display = 'none';
+            const roomCodeEl = document.getElementById('lobby-room-code');
+            const hostControlsEl = document.getElementById('lobby-host-controls');
+            const clientControlsEl = document.getElementById('lobby-client-controls');
+            if (roomCodeEl) roomCodeEl.innerText = "ROOM " + currentRoomId;
+            if (hostControlsEl) hostControlsEl.style.display = 'block';
+            if (clientControlsEl) clientControlsEl.style.display = 'none';
             renderLobby();
             console.log('[Network] Host peer ready:', id);
         });
@@ -828,9 +851,12 @@ function initPeer(host) {
                 updateStatus("🟢 Connected to Host");
                 logMessage("CONNECTED TO HOST");
                 showScreen('lobby');
-                document.getElementById('lobby-room-code').innerText = "ROOM " + currentRoomId;
-                document.getElementById('lobby-host-controls').style.display = 'none';
-                document.getElementById('lobby-client-controls').style.display = 'block';
+                const roomCodeEl = document.getElementById('lobby-room-code');
+                const hostControlsEl = document.getElementById('lobby-host-controls');
+                const clientControlsEl = document.getElementById('lobby-client-controls');
+                if (roomCodeEl) roomCodeEl.innerText = "ROOM " + currentRoomId;
+                if (hostControlsEl) hostControlsEl.style.display = 'none';
+                if (clientControlsEl) clientControlsEl.style.display = 'block';
                 connectionRetry.reset(currentRoomId);
                 console.log('[Network] Client connected to host:', targetId);
             });
@@ -2046,8 +2072,9 @@ function addDialogueOption(text, callback) {
 }
 
 function closeDialogue() {
-    document.getElementById('dialogue-box').style.display = 'none';
-    gameState.isInDialogue = false;
+    const dialogueBox = document.getElementById('dialogue-box');
+    if (dialogueBox) dialogueBox.style.display = 'none';
+    if (gameState) gameState.isInDialogue = false;
     safeRequestPointerLock();
 }
 
@@ -2783,16 +2810,20 @@ window.editorApplySettings = function() {
 };
 
 window.editorSave = function() {
-    const data = {
-        worldSeed: gameState.worldSeed,
-        objects: objects.filter(o => o && !o.userData?.player).map(o => ({
-            type: o.userData?.type || 'generic',
-            pos: { x: o.position.x, y: o.position.y, z: o.position.z },
-            rot: { x: o.rotation.x, y: o.rotation.y, z: o.rotation.z }
-        }))
-    };
-    localStorage.setItem('omni_world_save', JSON.stringify(data));
-    console.log('[Editor] World saved to localStorage (omni_world_save) - objects:', data.objects.length);
+    try {
+        const data = {
+            worldSeed: gameState.worldSeed,
+            objects: objects.filter(o => o && !o.userData?.player).map(o => ({
+                type: o.userData?.type || 'generic',
+                pos: { x: o.position.x, y: o.position.y, z: o.position.z },
+                rot: { x: o.rotation.x, y: o.rotation.y, z: o.rotation.z }
+            }))
+        };
+        localStorage.setItem('omni_world_save', JSON.stringify(data));
+        console.log('[Editor] World saved to localStorage (omni_world_save) - objects:', data.objects.length);
+    } catch(e) {
+        console.error('[Editor] Failed to save world data:', e);
+    }
 };
 
 window.editorLoad = function() {
