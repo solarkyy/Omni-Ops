@@ -13,7 +13,9 @@ const ModuleLoader = {
     ],
     loaded: 0,
     total: 0,
+    failedModules: [],
     init: function () {
+        console.log('[ModuleLoader] Initializing module loader...');
         this.total = this.modules.filter(m => m.required).length;
         this.updateStatus('Loading modules...');
         this.renderModuleList();
@@ -38,22 +40,29 @@ const ModuleLoader = {
             script.src = module.file;
             script.async = false;
             script.type = 'text/javascript';
+            
             script.onload = () => {
-                if (module.required) this.loaded++;
-                this.updateModuleStatus(module.name, 'loaded');
-                this.updateProgress();
+                try {
+                    if (module.required) this.loaded++;
+                    this.updateModuleStatus(module.name, 'loaded');
+                    this.updateProgress();
+                    console.log(`[ModuleLoader] ✓ Successfully loaded: ${module.name}`);
+                } catch (err) {
+                    console.error(`[ModuleLoader] Error after loading ${module.name}:`, err);
+                }
                 index++;
-                console.log(`[ModuleLoader] Successfully loaded: ${module.name}`);
                 setTimeout(loadNext, 100);
             };
+            
             script.onerror = (e) => {
                 const err = `Failed to load ${module.name}: ${module.file}`;
-                console.error(err, e);
-                console.warn(`Failed to load ${module.name}`);
+                console.error(`[ModuleLoader] ✗ ${err}`, e);
+                this.failedModules.push(module.name);
                 this.updateModuleStatus(module.name, 'failed');
                 index++;
                 setTimeout(loadNext, 100);
             };
+            
             document.body.appendChild(script);
         };
         loadNext();
@@ -76,32 +85,56 @@ const ModuleLoader = {
     complete: function () {
         this.updateStatus('All systems ready!');
         this.updateProgress();
+        
+        if (this.failedModules.length > 0) {
+            console.error('[ModuleLoader] WARNING: Some modules failed to load:', this.failedModules);
+        }
+        
         setTimeout(() => {
-            document.getElementById('loading-screen').classList.add('hidden');
-            window.modulesReady = true;
-            console.log('[ModuleLoader] Setting modulesReady = true');
-            // Initialize button bindings and UI - wait for initializeUI to be defined
-            let attempts = 0;
-            const waitForInit = () => {
-                if (window.initializeUI) {
-                    console.log('[ModuleLoader] Calling initializeUI');
-                    window.initializeUI();
-                } else {
-                    attempts++;
-                    if (attempts < 10) {
-                        console.log('[ModuleLoader] Waiting for initializeUI... attempt', attempts);
-                        setTimeout(waitForInit, 50);
+            try {
+                document.getElementById('loading-screen').classList.add('hidden');
+                window.modulesReady = true;
+                console.log('[ModuleLoader] Setting modulesReady = true');
+                
+                // Initialize button bindings and UI - wait for initializeUI to be defined
+                let attempts = 0;
+                const waitForInit = () => {
+                    if (window.initializeUI) {
+                        console.log('[ModuleLoader] Calling initializeUI');
+                        window.initializeUI();
                     } else {
-                        console.error('[ModuleLoader] window.initializeUI never became available!');
+                        attempts++;
+                        if (attempts < 20) {
+                            console.log(`[ModuleLoader] Waiting for initializeUI... attempt ${attempts}`);
+                            setTimeout(waitForInit, 100);
+                        } else {
+                            console.error('[ModuleLoader] FATAL: window.initializeUI never became available!');
+                            console.error('[ModuleLoader] Available globals:', Object.keys(window).filter(k => k.includes('init')));
+                        }
                     }
-                }
-            };
-            waitForInit();
-            console.log('%c✅ All modules loaded', 'color:#0f6');
+                };
+                waitForInit();
+                console.log('%c✅ All modules loaded', 'color:#0f6');
+            } catch (err) {
+                console.error('[ModuleLoader] Error in complete():', err);
+            }
         }, 500);
     }
 };
 window.addEventListener('load', () => ModuleLoader.init());
+
+// Global error handler to catch any uncaught errors
+window.addEventListener('error', (event) => {
+    console.error('[Global Error Handler] Uncaught error:', event.error);
+    if (event.error && event.error.stack) {
+        console.error('[Stack]', event.error.stack);
+    }
+});
+
+// Handler for unhandled promise rejections
+window.addEventListener('unhandledrejection', (event) => {
+    console.error('[Unhandled Rejection]', event.reason);
+});
 
 // Editor System
 window.editorActive = false;
