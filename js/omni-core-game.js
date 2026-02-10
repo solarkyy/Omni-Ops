@@ -687,6 +687,19 @@ window.initializeUI = function() {
         };
     }
 
+    // Settings Resume Button (in-game menu)
+    const settingsResumeBtn = document.getElementById('btn-settings-resume');
+    if(settingsResumeBtn) {
+        settingsResumeBtn.onclick = () => {
+            console.log('[UI] btn-settings-resume clicked');
+            const menuOverlay = document.getElementById('menu-overlay');
+            if (menuOverlay) menuOverlay.style.display = 'none';
+            const settingsScreen = document.getElementById('settings-screen');
+            if (settingsScreen) settingsScreen.style.display = 'none';
+            safeRequestPointerLock();
+        };
+    }
+
     const sensSlider = document.getElementById('set-sens');
     if(sensSlider) sensSlider.oninput = (e) => { SETTINGS.MOUSE_SENSE = 0.002 * parseFloat(e.target.value); };
 
@@ -2675,6 +2688,28 @@ document.addEventListener('keydown', e => {
     
     if (gameState.isPipboyOpen) {
         if (e.code === 'Escape') togglePipboy();
+        return;
+    }
+
+    // ESC opens settings menu during gameplay
+    if (e.code === 'Escape' && isGameActive && !gameState.isInDialogue && !gameState.isPipboyOpen && !window.UE5?.active) {
+        e.preventDefault();
+        const settingsScreen = document.getElementById('settings-screen');
+        const menuOverlay = document.getElementById('menu-overlay');
+        if (settingsScreen && menuOverlay) {
+            const isSettingsOpen = settingsScreen.style.display !== 'none';
+            if (isSettingsOpen) {
+                // Close settings and resume
+                settingsScreen.style.display = 'none';
+                menuOverlay.style.display = 'none';
+                safeRequestPointerLock();
+            } else {
+                // Open settings
+                settingsScreen.style.display = 'flex';
+                menuOverlay.style.display = 'flex';
+                document.exitPointerLock();
+            }
+        }
         return;
     }
 
