@@ -2610,9 +2610,24 @@ document.addEventListener('keydown', e => {
         return;
     }
     
-    // Toggle Pipboy
+    // Toggle Inventory (I key) - Separate from Pip-Boy
     if (e.code === 'KeyI' && isGameActive && !gameState.isInDialogue) {
-        togglePipboy();
+        // If Pip-Boy is open, switch to inventory tab
+        if (gameState.isPipboyOpen && window.PB) {
+            window.PB.tab = 'inv';
+            window.PB.switchTab(null, 'inv');
+            console.log('[Game] Pip-Boy switched to Inventory tab');
+        } else if (!gameState.isPipboyOpen) {
+            // If Pip-Boy is closed, open it at inventory tab
+            togglePipboy();
+            setTimeout(() => {
+                if (window.PB) {
+                    window.PB.tab = 'inv';
+                    window.PB.switchTab(null, 'inv');
+                    console.log('[Game] Pip-Boy opened at Inventory tab');
+                }
+            }, 100);
+        }
         return;
     }
     
@@ -2622,25 +2637,9 @@ document.addEventListener('keydown', e => {
         return;
     }
     
-    // Toggle Inventory (Tab key) - DISABLED in editor mode
-    if (e.code === 'Tab') { 
-        e.preventDefault();
-        if (window.UE5Editor && window.UE5Editor.active) {
-            return; // Don't trigger inventory in editor mode
-        }
-        if (isGameActive && !gameState.isInDialogue && !gameState.isPipboyOpen) {
-            gameState.isInventoryOpen = !gameState.isInventoryOpen;
-            if (gameState.isInventoryOpen) {
-                document.exitPointerLock();
-                console.log('[Game] Inventory: OPEN (pointer lock released)');
-            } else {
-                console.log('[Game] Inventory: CLOSED - Click game to regain control');
-                // Don't auto-request pointer lock - let user click to regain control
-                // This avoids SecurityError from rapid lock/unlock cycles
-            }
-        }
-        return;
-    }
+    // Tab opens Pip-Boy (handled by Pip-Boy system)
+    // I key is intentionally NOT implemented here - use Pip-Boy instead
+    // Pip-Boy includes Map, Quests, and Inventory tabs
     
     if (gameState.isInDialogue) {
         if (e.code === 'Escape') closeDialogue();
