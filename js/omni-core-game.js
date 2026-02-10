@@ -2311,6 +2311,19 @@ function updatePhysics(delta) {
     moveDir.normalize();
 
     const isMoving = moveDir.length() > 0;
+    
+    // Debug: Log input state every 60 frames
+    if (window.frameCount % 60 === 0 && isStartFrame) {
+        console.log('[Movement Debug]', {
+            keysPressed: { W: keys['KeyW'], A: keys['KeyA'], S: keys['KeyS'], D: keys['KeyD'] },
+            moveDir: { x: moveDir.x.toFixed(2), z: moveDir.z.toFixed(2) },
+            isMoving: isMoving,
+            velocity: { x: player.velocity.x.toFixed(2), z: player.velocity.z.toFixed(2), y: player.velocity.y.toFixed(2) },
+            cameraPos: { x: cameraRig.position.x.toFixed(1), y: cameraRig.position.y.toFixed(1), z: cameraRig.position.z.toFixed(1) },
+            pointerLock: !!document.pointerLockElement
+        });
+    }
+    window.isStartFrame = true;
     const wantsSprint = (keys['ShiftLeft'] || keys['ShiftRight']) && isMoving && !player.isCrouching && !player.isAiming;
     
     if (wantsSprint && player.stamina > 20 && !player.isExhausted) {
