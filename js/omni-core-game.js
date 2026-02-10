@@ -681,6 +681,12 @@ window.initializeUI = function() {
     if(resumeBtn) {
         resumeBtn.onclick = () => {
             console.log('[UI] btn-resume clicked');
+            // Clear all blocking flags
+            if (gameState) {
+                gameState.isInDialogue = false;
+                gameState.isPipboyOpen = false;
+                gameState.isInventoryOpen = false;
+            }
             const menuOverlay = document.getElementById('menu-overlay');
             if (menuOverlay) menuOverlay.style.display = 'none';
             safeRequestPointerLock();
@@ -692,6 +698,12 @@ window.initializeUI = function() {
     if(settingsResumeBtn) {
         settingsResumeBtn.onclick = () => {
             console.log('[UI] btn-settings-resume clicked');
+            // Clear all blocking flags
+            if (gameState) {
+                gameState.isInDialogue = false;
+                gameState.isPipboyOpen = false;
+                gameState.isInventoryOpen = false;
+            }
             const menuOverlay = document.getElementById('menu-overlay');
             if (menuOverlay) menuOverlay.style.display = 'none';
             const settingsScreen = document.getElementById('settings-screen');
@@ -2700,6 +2712,12 @@ document.addEventListener('keydown', e => {
             const isSettingsOpen = settingsScreen.style.display !== 'none';
             if (isSettingsOpen) {
                 // Close settings and resume
+                // Clear all blocking flags
+                if (gameState) {
+                    gameState.isInDialogue = false;
+                    gameState.isPipboyOpen = false;
+                    gameState.isInventoryOpen = false;
+                }
                 settingsScreen.style.display = 'none';
                 menuOverlay.style.display = 'none';
                 safeRequestPointerLock();
