@@ -1,0 +1,36 @@
+/* OMNI-OPS Core Styles */
+/* Core game styling and base elements */
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    font-family: 'Courier New', monospace;
+    background: #000;
+}
+
+/* Version indicator */
+#version-indicator {
+    position: fixed;
+    bottom: 5px;
+    right: 5px;
+    color: rgba(0, 255, 100, 0.5);
+    font-size: 10px;
+    z-index: 100;
+    pointer-events: none;
+    font-family: monospace;
+}
+
+/* Game container */
+#game-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+}

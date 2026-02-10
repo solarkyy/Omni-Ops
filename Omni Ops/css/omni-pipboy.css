@@ -1,0 +1,91 @@
+/* OMNI-OPS Pip-Boy Interface Styles */
+
+#pipboy-menu {
+    font-family: 'Courier New', monospace;
+    color: #0f6;
+}
+
+#pipboy-menu::-webkit-scrollbar {
+    width: 8px;
+}
+
+#pipboy-menu::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.5);
+}
+
+#pipboy-menu::-webkit-scrollbar-thumb {
+    background: #0f6;
+    border-radius: 4px;
+}
+
+#pipboy-menu::-webkit-scrollbar-thumb:hover {
+    background: #00d9ff;
+}
+
+.pipboy-section {
+    margin-bottom: 20px;
+}
+
+.pipboy-section h3 {
+    color: #0f6;
+    font-size: 14px;
+    margin: 0 0 10px 0;
+    padding-bottom: 5px;
+    border-bottom: 1px solid #0f6;
+}
+
+.pipboy-stat {
+    display: flex;
+    justify-content: space-between;
+    padding: 5px 0;
+    font-size: 12px;
+}
+
+.pipboy-stat-label {
+    color: #0f6;
+    opacity: 0.8;
+}
+
+.pipboy-stat-value {
+    color: #0f6;
+    font-weight: bold;
+}
+
+.pipboy-tab {
+    background: rgba(0, 255, 100, 0.1);
+    border: 1px solid #0f6;
+    color: #0f6;
+    padding: 8px 15px;
+    margin: 5px;
+    cursor: pointer;
+    font-family: monospace;
+    font-size: 12px;
+    transition: all 0.2s;
+}
+
+.pipboy-tab:hover {
+    background: rgba(0, 255, 100, 0.3);
+    box-shadow: 0 0 10px #0f6;
+}
+
+.pipboy-tab.active {
+    background: #0f6;
+    color: #000;
+    font-weight: bold;
+}
+
+.reputation-bar {
+    width: 100%;
+    height: 10px;
+    background: #1a1a1a;
+    border: 1px solid #0f6;
+    margin: 5px 0;
+    position: relative;
+    overflow: hidden;
+}
+
+.reputation-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #ff0000, #ffff00, #00ff00);
+    transition: width 0.3s;
+}
