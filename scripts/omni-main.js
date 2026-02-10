@@ -41,7 +41,24 @@ const ModuleLoader = {
             script.async = false;
             script.type = 'text/javascript';
             
+            let loaded = false;
+            
+            const timeoutId = setTimeout(() => {
+                if (!loaded) {
+                    console.warn(`[ModuleLoader] Timeout loading ${module.name}, continuing...`);
+                    loaded = true;
+                    if (module.required) this.loaded++;
+                    this.updateModuleStatus(module.name, 'loaded');
+                    this.updateProgress();
+                    index++;
+                    setTimeout(loadNext, 100);
+                }
+            }, 5000);
+            
             script.onload = () => {
+                if (loaded) return;
+                loaded = true;
+                clearTimeout(timeoutId);
                 try {
                     if (module.required) this.loaded++;
                     this.updateModuleStatus(module.name, 'loaded');
@@ -55,10 +72,14 @@ const ModuleLoader = {
             };
             
             script.onerror = (e) => {
+                if (loaded) return;
+                loaded = true;
+                clearTimeout(timeoutId);
                 const err = `Failed to load ${module.name}: ${module.file}`;
                 console.error(`[ModuleLoader] ✗ ${err}`, e);
                 this.failedModules.push(module.name);
                 this.updateModuleStatus(module.name, 'failed');
+                if (module.required) this.loaded++;
                 index++;
                 setTimeout(loadNext, 100);
             };
@@ -124,16 +145,26 @@ const ModuleLoader = {
                         } catch (initErr) {
                             console.error('[ModuleLoader] Error calling initializeUI:', initErr);
                             if (initErr.stack) console.error(initErr.stack);
+                            // Force show menu as fallback
+                            document.getElementById('menu-overlay').style.display = 'flex';
                         }
                     } else {
                         attempts++;
-                        if (attempts < 30) {
-                            console.log(`[ModuleLoader] Waiting for initializeUI... attempt ${attempts}/30`);
+                        if (attempts < 50) {
+                            if (attempts % 10 === 0) {
+                                console.log(`[ModuleLoader] Waiting for initializeUI... attempt ${attempts}/50`);
+                            }
                             setTimeout(waitForInit, 100);
                         } else {
                             console.error('[ModuleLoader] FATAL: window.initializeUI never became available!');
                             console.error('[ModuleLoader] Available windowed globals with "init":', 
                                 Object.keys(window).filter(k => k.toLowerCase().includes('init')).slice(0, 20));
+                            
+                            // Force show menu as fallback
+                            try {
+                                document.getElementById('menu-overlay').style.display = 'flex';
+                                document.getElementById('loading-screen').style.display = 'none';
+                            } catch(e) {}
                             
                             // Try to show the game anyway as fallback
                             if (window.launchGame) {
@@ -147,6 +178,10 @@ const ModuleLoader = {
                 console.log('%c✅ Module loading complete', 'color:#0f6; font-weight: bold;');
             } catch (err) {
                 console.error('[ModuleLoader] Error in complete():', err, err.stack);
+                // Force show menu as fallback
+                try {
+                    document.getElementById('menu-overlay').style.display = 'flex';
+                } catch(e) {}
             }
         }, 500);
     }
@@ -159,6 +194,31 @@ window.addEventListener('error', (event) => {
     if (event.error && event.error.stack) {
         console.error('[Stack]', event.error.stack);
     }
+    // Try to force show menu if there's an error during loading
+    setTimeout(() => {
+        try {
+            if (!window.modulesReady) {
+                const loadingScreen = document.getElementById('loading-screen');
+                if (loadingScreen) {
+                    loadingScreen.innerHTML = `
+                        <div class="loading-logo">⚡ OMNI-OPS</div>
+                        <div style="color: #f44; font-size: 14px; margin: 20px;">
+                            ⚠ Module Loading Error
+                        </div>
+                        <div style="color: #0f6; font-size: 12px; margin: 10px;">
+                            Attempting recovery...
+                        </div>
+                    `;
+                }
+                window.modulesReady = true;
+                if (window.initializeUI) {
+                    window.initializeUI();
+                }
+            }
+        } catch (e) {
+            console.error('Failed to handle error:', e);
+        }
+    }, 500);
 });
 
 // Handler for unhandled promise rejections

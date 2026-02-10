@@ -340,6 +340,19 @@
             }
         };
         console.log('Page loaded, waiting for modules...');
+        
+        // Wrap the entire window in error protection
+        const originalEval = window.eval;
+        window.moduleLoadErrors = [];
+        window.eval = function(code) {
+            try {
+                return originalEval.call(window, code);
+            } catch (e) {
+                console.error('[Module Eval Error]', e.message);
+                window.moduleLoadErrors.push(e.message);
+                throw e;
+            }
+        };
     </script>
     <script src="scripts/omni-main.js" defer></script>
     <script src="scripts/omni-diagnostics.js" defer></script>
@@ -353,6 +366,28 @@
                 }
             }, 3000);
         });
+        
+        // Safety net: Force show menu if loading takes too long
+        setTimeout(() => {
+            const loadingScreen = document.getElementById('loading-screen');
+            const menuOverlay = document.getElementById('menu-overlay');
+            
+            if (loadingScreen && loadingScreen.style.display !== 'none' && !loadingScreen.classList.contains('hidden')) {
+                console.warn('[Safety Net] Loading screen still showing after 15 seconds, forcing menu display');
+                loadingScreen.classList.add('hidden');
+                if (menuOverlay) menuOverlay.style.display = 'flex';
+                window.modulesReady = true;
+                
+                // Try to initialize UI if it exists
+                if (window.initializeUI) {
+                    try {
+                        window.initializeUI();
+                    } catch (e) {
+                        console.error('[Safety Net] Error calling initializeUI:', e);
+                    }
+                }
+            }
+        }, 15000);
     </script>
     <div id="page-debug-log" style="position:fixed; bottom:10px; right:10px; background:rgba(0,0,0,0.8); color:#0f6; padding:10px; font-size:10px; max-width:300px; max-height:100px; overflow-y:auto; border:1px solid #0f6; z-index:5000; pointer-events:none;"></div>
 </body>
