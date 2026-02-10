@@ -86,9 +86,26 @@ const ModuleLoader = {
         this.updateStatus('All systems ready!');
         this.updateProgress();
         
+        // Log module loading status
+        console.log(`[ModuleLoader] Loaded ${this.loaded}/${this.total} required modules`);
+        
         if (this.failedModules.length > 0) {
             console.error('[ModuleLoader] WARNING: Some modules failed to load:', this.failedModules);
         }
+        
+        // Check for critical functions
+        const criticalFunctions = {
+            'launchGame': window.launchGame,
+            'startMode': window.startMode,
+            'GameStory': typeof GameStory !== 'undefined',
+            'PB': typeof PB !== 'undefined'
+        };
+        
+        console.group('[ModuleLoader] Critical Functions Check');
+        Object.entries(criticalFunctions).forEach(([name, exists]) => {
+            console.log(`${exists ? '✓' : '✗'} ${name}:`, exists);
+        });
+        console.groupEnd();
         
         setTimeout(() => {
             try {
@@ -100,23 +117,36 @@ const ModuleLoader = {
                 let attempts = 0;
                 const waitForInit = () => {
                     if (window.initializeUI) {
-                        console.log('[ModuleLoader] Calling initializeUI');
-                        window.initializeUI();
+                        console.log('[ModuleLoader] ✓ Found initializeUI, calling it now...');
+                        try {
+                            window.initializeUI();
+                            console.log('[ModuleLoader] ✓ initializeUI completed successfully');
+                        } catch (initErr) {
+                            console.error('[ModuleLoader] Error calling initializeUI:', initErr);
+                            if (initErr.stack) console.error(initErr.stack);
+                        }
                     } else {
                         attempts++;
-                        if (attempts < 20) {
-                            console.log(`[ModuleLoader] Waiting for initializeUI... attempt ${attempts}`);
+                        if (attempts < 30) {
+                            console.log(`[ModuleLoader] Waiting for initializeUI... attempt ${attempts}/30`);
                             setTimeout(waitForInit, 100);
                         } else {
                             console.error('[ModuleLoader] FATAL: window.initializeUI never became available!');
-                            console.error('[ModuleLoader] Available globals:', Object.keys(window).filter(k => k.includes('init')));
+                            console.error('[ModuleLoader] Available windowed globals with "init":', 
+                                Object.keys(window).filter(k => k.toLowerCase().includes('init')).slice(0, 20));
+                            
+                            // Try to show the game anyway as fallback
+                            if (window.launchGame) {
+                                console.log('[ModuleLoader] Fallback: Calling launchGame directly');
+                                window.launchGame();
+                            }
                         }
                     }
                 };
                 waitForInit();
-                console.log('%c✅ All modules loaded', 'color:#0f6');
+                console.log('%c✅ Module loading complete', 'color:#0f6; font-weight: bold;');
             } catch (err) {
-                console.error('[ModuleLoader] Error in complete():', err);
+                console.error('[ModuleLoader] Error in complete():', err, err.stack);
             }
         }, 500);
     }
