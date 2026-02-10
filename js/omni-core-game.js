@@ -298,9 +298,21 @@ function launchGame() {
     }
 }
 
+let pointerLockRetryTimer = null;
 function safeRequestPointerLock() {
-    if (!gameState.isInDialogue && !gameState.isPipboyOpen && isGameActive) {
-        try { document.body.requestPointerLock(); } catch (e) {}
+    if (!gameState.isInDialogue && !gameState.isPipboyOpen && !gameState.isInventoryOpen && isGameActive) {
+        try {
+            document.body.requestPointerLock();
+            console.log('[PointerLock] Requested successfully');
+        } catch (e) {
+            if (e.name === 'SecurityError') {
+                console.log('[PointerLock] SecurityError caught - retrying in 100ms');
+                if (pointerLockRetryTimer) clearTimeout(pointerLockRetryTimer);
+                pointerLockRetryTimer = setTimeout(safeRequestPointerLock, 100);
+            } else {
+                console.error('[PointerLock] Error:', e.message);
+            }
+        }
     }
 }
 
@@ -2268,7 +2280,7 @@ function createImpactEffect(point, normal) {
 }
 
 function updatePhysics(delta) {
-    if (gameState.isInDialogue || gameState.isPipboyOpen) return; 
+    if (gameState.isInDialogue || gameState.isPipboyOpen || gameState.isInventoryOpen) return; 
 
     if (gameMode === 'COMMANDER') {
         updateMinimap();
@@ -2280,7 +2292,17 @@ function updatePhysics(delta) {
         return;
     }
 
-    if (!document.pointerLockElement) return;
+    // Require pointer lock for first-person movement
+    if (!document.pointerLockElement) {
+        // Pointer lock lost - show hint on first frame without it
+        if (!window.pointerLockLostOnce) {
+            window.pointerLockLostOnce = true;
+            console.log('[Movement] Pointer lock lost - Click game window to regain control');
+        }
+        return;
+    } else {
+        window.pointerLockLostOnce = false;
+    }
     
     // STAMINA SYSTEM
     const moveDir = new THREE.Vector3();
@@ -2479,6 +2501,23 @@ document.addEventListener('pointerlockchange', () => {
     }
 });
 
+// Click to regain pointer lock when lost during gameplay
+document.addEventListener('click', () => {
+    if (isGameActive && !gameState.isInventoryOpen && !gameState.isPipboyOpen && !gameState.isInDialogue && gameMode === 'FPS' && !document.pointerLockElement) {
+        safeRequestPointerLock();
+    }
+});
+
+// Handle pointer lock errors gracefully
+window.addEventListener('unhandledrejection', (event) => {
+    if (event.reason && event.reason.name === 'SecurityError' && event.reason.message && event.reason.message.includes('lock')) {
+        console.log('[PointerLock] Handled SecurityError gracefully - lock state changed');
+        event.preventDefault();
+        return;
+    }
+    console.error('[Unhandled Rejection]', event.reason);
+});
+
 document.addEventListener('mousemove', (e) => {
     if (gameState.isInDialogue || gameState.isPipboyOpen) return; 
 
@@ -2580,10 +2619,12 @@ document.addEventListener('keydown', e => {
             gameState.isInventoryOpen = !gameState.isInventoryOpen;
             if (gameState.isInventoryOpen) {
                 document.exitPointerLock();
+                console.log('[Game] Inventory: OPEN (pointer lock released)');
             } else {
-                safeRequestPointerLock();
+                console.log('[Game] Inventory: CLOSED - Click game to regain control');
+                // Don't auto-request pointer lock - let user click to regain control
+                // This avoids SecurityError from rapid lock/unlock cycles
             }
-            console.log('[Game] Inventory:', gameState.isInventoryOpen ? 'OPEN' : 'CLOSED');
         }
         return;
     }
