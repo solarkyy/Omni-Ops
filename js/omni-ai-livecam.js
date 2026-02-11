@@ -11,13 +11,330 @@ const AILiveCam = {
     updateInterval: null,
     statsInterval: null,
     thoughtUpdateInterval: null,
+    visionUpdateInterval: null,
     serverUrl: 'http://localhost:8080',
+    ws: null,
+    wsConnected: false,
     
     init: function() {
         console.log('[AI Live Cam] Creating UI...');
         this.createUI();
         this.setupKeys();
         this.setupStyles();
+        this.connectWebSocket();
+    },
+
+    connectWebSocket: function() {
+        try {
+            this.ws = new WebSocket('ws://localhost:8080');
+
+            this.ws.onopen = () => {
+                console.log('[AI Live Cam] WebSocket connected to backend');
+                this.wsConnected = true;
+                this.log('✓ Connected to AI backend server', 'ai-success');
+            };
+
+            this.ws.onclose = () => {
+                console.log('[AI Live Cam] WebSocket disconnected');
+                this.wsConnected = false;
+                this.log('⚠ Disconnected from AI backend', 'ai-action');
+                // Attempt reconnect after 5 seconds
+                setTimeout(() => this.connectWebSocket(), 5000);
+            };
+
+            this.ws.onerror = (error) => {
+                console.error('[AI Live Cam] WebSocket error:', error);
+                this.wsConnected = false;
+            };
+
+            this.ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    this.handleServerMessage(data);
+                } catch (err) {
+                    console.error('[AI Live Cam] Failed to parse server message:', err);
+                }
+            };
+        } catch (err) {
+            console.error('[AI Live Cam] Failed to connect WebSocket:', err);
+            this.log('Running in offline mode - advanced AI features unavailable', 'ai-action');
+        }
+    },
+
+    handleServerMessage: function(data) {
+        if (data.type === 'ai_message') {
+            // AI backend sent a message/analysis
+            this.addChatMessage('AI', data.content);
+        } else if (data.type === 'ai_action') {
+            // AI backend wants to perform an action
+            this.log(`🤖 Backend AI: ${data.action}`, 'ai-action');
+            this.addChatMessage('SYSTEM', `AI Action: ${data.action}`);
+        } else if (data.type === 'ai_analysis') {
+            // Vision analysis from backend
+            this.addChatMessage('AI', `Vision Analysis: ${data.content}`);
+        } else if (data.type === 'ai_response') {
+            // Direct chat response
+            this.addChatMessage('AI', data.content);
+        } else if (data.type === 'ai_report') {
+            // System report from AI
+            this.addChatMessage('AI', data.content);
+        }
+    },
+
+    addChatMessage: function(sender, content) {
+        const container = document.getElementById('ai-chat-messages');
+        if (!container) return;
+
+        const timestamp = new Date().toLocaleTimeString();
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `chat-message ${sender.toLowerCase()}`;
+
+        messageDiv.innerHTML = `
+            <div class="chat-message-header">
+                <span class="chat-sender ${sender.toLowerCase()}">${sender}</span>
+                <span class="chat-timestamp">${timestamp}</span>
+            </div>
+            <div class="chat-content">${content}</div>
+        `;
+
+        container.appendChild(messageDiv);
+        container.scrollTop = container.scrollHeight;
+    },
+
+    sendChatMessage: function() {
+        const input = document.getElementById('ai-chat-input');
+        if (!input || !input.value.trim()) return;
+
+        const message = input.value.trim();
+        this.addChatMessage('USER', message);
+
+        // Get current game state and vision
+        const gameState = window.AIPlayerAPI ? window.AIPlayerAPI.getGameState() : null;
+        const visionCanvas = document.getElementById('ai-vision-canvas');
+        const visionData = visionCanvas ? visionCanvas.toDataURL('image/png') : null;
+
+        // Send to backend if connected
+        if (this.wsConnected) {
+            this.sendToBackend({
+                type: 'chat_message',
+                message: message,
+                gameState: gameState,
+                vision: visionData,
+                timestamp: Date.now()
+            });
+        } else {
+            // Offline mode - simulate AI response
+            this.simulateAIResponse(message, gameState);
+        }
+
+        input.value = '';
+    },
+
+    simulateAIResponse: function(userMessage, gameState) {
+        // Offline AI response based on game state
+        setTimeout(() => {
+            let response = '';
+
+            const lower = userMessage.toLowerCase();
+
+            if (lower.includes('test') || lower.includes('report') || lower.includes('diagnostic')) {
+                response = this.generateTestReport(gameState);
+            } else if (lower.includes('see') || lower.includes('vision') || lower.includes('look') || lower.includes('view')) {
+                if (gameState && gameState.enemies.length > 0) {
+                    response = `I can see ${gameState.enemies.length} enemies. The closest one is at ${gameState.enemies[0].distance.toFixed(1)}m.`;
+                } else {
+                    response = "I don't see any enemies right now. The area appears clear.";
+                }
+            } else if (lower.includes('health') || lower.includes('status')) {
+                if (gameState) {
+                    response = `My status:\n- Health: ${gameState.player.health}/${gameState.player.maxHealth}\n- Ammo: ${gameState.player.ammo}/${gameState.player.reserveAmmo}\n- Position: (${gameState.player.x.toFixed(1)}, ${gameState.player.z.toFixed(1)})`;
+                } else {
+                    response = "Game is not active. Cannot check status.";
+                }
+            } else if (lower.includes('enemy') || lower.includes('enemies') || lower.includes('threat')) {
+                if (gameState && gameState.enemies.length > 0) {
+                    response = `There are ${gameState.enemies.length} enemies detected:\n` +
+                        gameState.enemies.slice(0, 3).map((e, i) =>
+                            `${i + 1}. ${e.faction} at ${e.distance.toFixed(1)}m (Health: ${e.health})`
+                        ).join('\n');
+                    if (gameState.enemies.length > 3) {
+                        response += `\n... and ${gameState.enemies.length - 3} more`;
+                    }
+                } else {
+                    response = "No enemies detected in the area.";
+                }
+            } else if (lower.includes('improve') || lower.includes('problem') || lower.includes('issue') || lower.includes('fix')) {
+                response = this.generateImprovementReport(gameState);
+            } else if (lower.includes('working') || lower.includes('works')) {
+                response = this.generateWorkingReport(gameState);
+            } else if (lower.includes('help') || lower.includes('command')) {
+                response = `I'm the AI assistant. Available commands:\n\n` +
+                    `📊 "test" or "report" - Run system diagnostics\n` +
+                    `👁️ "what do you see?" - Vision report\n` +
+                    `❤️ "status" or "health" - My current status\n` +
+                    `⚔️ "enemies" - Enemy threat analysis\n` +
+                    `✓ "what works?" - Report working systems\n` +
+                    `⚠️ "what's broken?" - Report issues\n` +
+                    `💡 "improvements" - Suggest improvements\n\n` +
+                    `I can see the game and analyze what's happening!`;
+            } else {
+                response = `I received your message: "${userMessage}". Note: AI backend is offline. For full functionality, please start the backend server. I can still answer basic questions about the game state.`;
+            }
+
+            this.addChatMessage('AI', response);
+        }, 500);
+    },
+
+    generateImprovementReport: function(gameState) {
+        const lines = [];
+        lines.push('=== IMPROVEMENT SUGGESTIONS ===\n');
+
+        // Vision system
+        const visionCanvas = document.getElementById('ai-vision-canvas');
+        if (!visionCanvas || !window.renderer) {
+            lines.push('⚠ VISION SYSTEM:');
+            lines.push('  - Game view canvas is not capturing properly');
+            lines.push('  - Recommendation: Check if window.renderer exists');
+            lines.push('  - This prevents me from "seeing" the game\n');
+        }
+
+        // Backend
+        if (!this.wsConnected) {
+            lines.push('⚠ AI BACKEND:');
+            lines.push('  - Backend server is offline');
+            lines.push('  - Missing: Advanced vision analysis, natural language');
+            lines.push('  - Recommendation: Run LAUNCH_AI_BACKEND.bat\n');
+        }
+
+        // Combat system
+        if (gameState && this.aiPlayerActive) {
+            lines.push('⚠ COMBAT AI:');
+            lines.push('  - Currently using basic decision tree');
+            lines.push('  - Could improve: Cover detection, team tactics');
+            lines.push('  - Could improve: Predictive aiming, flanking\n');
+        }
+
+        // Performance
+        lines.push('💡 PERFORMANCE:');
+        lines.push('  - Vision updates at 10 FPS (could be higher)');
+        lines.push('  - AI decision loop at 10 Hz (good)');
+        lines.push('  - Could add: Frame rate adaptation\n');
+
+        if (lines.length === 1) {
+            return 'Everything appears to be working well! No major improvements needed at this time.';
+        }
+
+        return lines.join('\n');
+    },
+
+    generateWorkingReport: function(gameState) {
+        const lines = [];
+        lines.push('=== WORKING SYSTEMS ===\n');
+
+        // Game API
+        if (gameState) {
+            lines.push('✅ GAME API:');
+            lines.push('  - Player position tracking');
+            lines.push('  - Enemy detection and tracking');
+            lines.push('  - Health/ammo monitoring\n');
+        }
+
+        // Control System
+        if (window.AIPlayerAPI) {
+            lines.push('✅ CONTROL SYSTEM:');
+            lines.push('  - Movement controls (WASD)');
+            lines.push('  - Aiming and shooting');
+            lines.push('  - Sprint, crouch, reload\n');
+        }
+
+        // AI Logic
+        if (this.aiPlayerActive) {
+            lines.push('✅ AI DECISION MAKING:');
+            lines.push('  - Tactical combat engagement');
+            lines.push('  - Cover seeking when low health');
+            lines.push('  - Auto-reload when low ammo');
+            lines.push('  - Distance-based tactics\n');
+        }
+
+        // UI
+        lines.push('✅ USER INTERFACE:');
+        lines.push('  - Live statistics display');
+        lines.push('  - Tactical radar view');
+        lines.push('  - Activity logging');
+        lines.push('  - Chat system (this!)\n');
+
+        // Keybinds
+        lines.push('✅ CONTROLS:');
+        lines.push('  - F4 to open/close');
+        lines.push('  - Difficulty settings');
+        lines.push('  - Aggression slider');
+
+        return lines.join('\n');
+    },
+
+    generateTestReport: function(gameState) {
+        const lines = [];
+        lines.push('=== AI SYSTEM TEST REPORT ===\n');
+
+        // Test 1: Game API
+        if (gameState) {
+            lines.push('✓ Game API: WORKING');
+            lines.push(`  - Player at (${gameState.player.x.toFixed(1)}, ${gameState.player.z.toFixed(1)})`);
+            lines.push(`  - Health: ${gameState.player.health}/${gameState.player.maxHealth}`);
+            lines.push(`  - Enemies visible: ${gameState.enemies.length}`);
+        } else {
+            lines.push('✗ Game API: NOT ACTIVE');
+        }
+
+        // Test 2: Vision System
+        const visionCanvas = document.getElementById('ai-vision-canvas');
+        if (visionCanvas && window.renderer) {
+            lines.push('✓ Vision System: WORKING');
+            lines.push(`  - Canvas: ${visionCanvas.width}x${visionCanvas.height}`);
+        } else {
+            lines.push('✗ Vision System: NOT WORKING');
+            lines.push('  - Issue: Canvas or renderer unavailable');
+        }
+
+        // Test 3: Backend Connection
+        if (this.wsConnected) {
+            lines.push('✓ Backend Server: CONNECTED');
+        } else {
+            lines.push('✗ Backend Server: OFFLINE');
+            lines.push('  - Recommendation: Start ai_backend_server.py');
+        }
+
+        // Test 4: Control System
+        if (window.AIPlayerAPI) {
+            lines.push('✓ Control System: AVAILABLE');
+            lines.push(`  - AI Active: ${this.aiPlayerActive ? 'YES' : 'NO'}`);
+        } else {
+            lines.push('✗ Control System: NOT FOUND');
+        }
+
+        lines.push('\n=== RECOMMENDATIONS ===');
+        if (!this.wsConnected) {
+            lines.push('- Start the Python backend server for advanced AI features');
+        }
+        if (!gameState) {
+            lines.push('- Start the game to enable AI testing');
+        }
+        if (gameState && gameState.enemies.length === 0) {
+            lines.push('- Spawn enemies to test combat AI');
+        }
+
+        return lines.join('\n');
+    },
+
+    sendToBackend: function(message) {
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+            this.ws.send(JSON.stringify(message));
+        }
+    },
+
+    addThought: function(text) {
+        // Legacy function - now routes to chat
+        this.addChatMessage('SYSTEM', text);
     },
     
     createUI: function() {
@@ -87,10 +404,16 @@ const AILiveCam = {
                                 </div>
                             </div>
                             
-                            <!-- Thoughts Stream -->
-                            <div class="ai-thoughts-panel">
-                                <div class="panel-title">💭 AI THOUGHTS</div>
-                                <div id="ai-thoughts" class="thoughts-stream"></div>
+                            <!-- AI Chat Interface -->
+                            <div class="ai-chat-panel">
+                                <div class="panel-title">💬 AI CHAT - Talk to the AI</div>
+                                <div id="ai-chat-messages" class="chat-messages"></div>
+                                <div class="chat-input-container">
+                                    <input type="text" id="ai-chat-input" class="chat-input"
+                                           placeholder="Ask the AI anything... (Enter to send)"
+                                           onkeypress="if(event.key==='Enter') window.AILiveCam.sendChatMessage()">
+                                    <button onclick="window.AILiveCam.sendChatMessage()" class="chat-send-btn">SEND</button>
+                                </div>
                             </div>
                             
                             <!-- Statistics -->
@@ -434,7 +757,7 @@ const AILiveCam = {
                 font-size: 11px;
                 line-height: 1.4;
             }
-            
+
             .thought-entry {
                 padding: 5px;
                 margin-bottom: 5px;
@@ -442,12 +765,121 @@ const AILiveCam = {
                 border-left: 3px solid #0f6;
                 border-radius: 2px;
             }
-            
+
             .thought-time {
                 color: #0f6;
                 margin-right: 8px;
             }
-            
+
+            /* Chat Interface Styles */
+            .ai-chat-panel {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                min-height: 300px;
+            }
+
+            .chat-messages {
+                flex: 1;
+                overflow-y: auto;
+                padding: 8px;
+                background: rgba(0, 0, 0, 0.5);
+                border: 1px solid #0f6;
+                border-radius: 4px;
+                margin-bottom: 8px;
+                font-size: 12px;
+                line-height: 1.5;
+                max-height: 400px;
+            }
+
+            .chat-message {
+                margin-bottom: 10px;
+                padding: 8px;
+                border-radius: 4px;
+                border-left: 3px solid #0f6;
+            }
+
+            .chat-message.user {
+                background: rgba(0, 255, 255, 0.1);
+                border-left-color: #0ff;
+            }
+
+            .chat-message.ai {
+                background: rgba(0, 255, 100, 0.1);
+                border-left-color: #0f6;
+            }
+
+            .chat-message.system {
+                background: rgba(255, 170, 0, 0.1);
+                border-left-color: #fa0;
+            }
+
+            .chat-message-header {
+                display: flex;
+                justify-content: space-between;
+                margin-bottom: 4px;
+                font-size: 10px;
+            }
+
+            .chat-sender {
+                font-weight: bold;
+                color: #0f6;
+            }
+
+            .chat-sender.user {
+                color: #0ff;
+            }
+
+            .chat-sender.system {
+                color: #fa0;
+            }
+
+            .chat-timestamp {
+                color: #666;
+            }
+
+            .chat-content {
+                color: #0f6;
+                white-space: pre-wrap;
+            }
+
+            .chat-input-container {
+                display: flex;
+                gap: 8px;
+            }
+
+            .chat-input {
+                flex: 1;
+                background: #000;
+                color: #0f6;
+                border: 1px solid #0f6;
+                border-radius: 4px;
+                padding: 8px;
+                font-family: 'Courier New', monospace;
+                font-size: 12px;
+            }
+
+            .chat-input:focus {
+                outline: none;
+                border-color: #0ff;
+                box-shadow: 0 0 8px rgba(0, 255, 255, 0.3);
+            }
+
+            .chat-send-btn {
+                background: #0f6;
+                color: #000;
+                border: none;
+                border-radius: 4px;
+                padding: 8px 16px;
+                font-weight: bold;
+                cursor: pointer;
+                font-family: 'Courier New', monospace;
+            }
+
+            .chat-send-btn:hover {
+                background: #0ff;
+            }
+
             .stats-grid {
                 display: grid;
                 grid-template-columns: repeat(3, 1fr);
@@ -616,6 +1048,11 @@ const AILiveCam = {
                 if (typeof document.exitPointerLock === 'function') {
                     document.exitPointerLock();
                 }
+
+                // Send welcome message
+                setTimeout(() => {
+                    this.addChatMessage('SYSTEM', 'AI Live Cam activated. Type "help" for available commands or "test" to run a system diagnostic.');
+                }, 100);
             } else {
                 overlay.classList.add('ai-livecam-hidden');
                 this.stopUpdates();
@@ -630,12 +1067,14 @@ const AILiveCam = {
         this.updateInterval = setInterval(() => this.updateDisplay(), 100);
         this.statsInterval = setInterval(() => this.updateStats(), 500);
         this.thoughtUpdateInterval = setInterval(() => this.updateThoughts(), 1000);
+        this.visionUpdateInterval = setInterval(() => this.updateGameVision(), 100);
     },
     
     stopUpdates: function() {
         if (this.updateInterval) clearInterval(this.updateInterval);
         if (this.statsInterval) clearInterval(this.statsInterval);
         if (this.thoughtUpdateInterval) clearInterval(this.thoughtUpdateInterval);
+        if (this.visionUpdateInterval) clearInterval(this.visionUpdateInterval);
     },
     
     updateDisplay: function() {
@@ -670,6 +1109,24 @@ const AILiveCam = {
     
     updateThoughts: function() {
         // This will be filled by AI player
+    },
+
+    updateGameVision: function() {
+        // Capture the actual game renderer output to the AI vision canvas
+        const visionCanvas = document.getElementById('ai-vision-canvas');
+        const gameRenderer = window.renderer;
+
+        if (!visionCanvas || !gameRenderer) return;
+
+        try {
+            const ctx = visionCanvas.getContext('2d');
+            const srcCanvas = gameRenderer.domElement;
+
+            // Draw the game canvas onto the AI vision canvas (scaled down)
+            ctx.drawImage(srcCanvas, 0, 0, visionCanvas.width, visionCanvas.height);
+        } catch (err) {
+            console.error('[AI Live Cam] Failed to capture game vision:', err);
+        }
     },
     
     drawRadar: function(state) {
@@ -739,17 +1196,67 @@ const AILiveCam = {
         document.getElementById('ai-player-status').textContent = 'AI Active';
         document.querySelector('.ai-dot').classList.add('active');
         this.aiPlayerActive = true;
-        
+
         // Activate AI control mode (bypasses pointer lock requirement)
         if (window.AIPlayerAPI) {
             window.AIPlayerAPI.activateAI();
             this.log('✓ AI control mode enabled', 'ai-success');
         }
-        
+
+        // Notify backend server
+        this.sendToBackend({
+            type: 'control_toggle',
+            enabled: true,
+            mode: 'autonomous'
+        });
+
         // Start AI decision loop
         this.startAILoop();
-        
+
+        // Start periodic vision updates to backend (every 2 seconds)
+        this.visionSendInterval = setInterval(() => {
+            if (this.wsConnected && this.aiPlayerActive) {
+                this.sendVisionToBackend();
+            }
+        }, 2000);
+
         this.log('AI player activated!', 'ai-success');
+        this.addChatMessage('SYSTEM', 'AI control activated. Analyzing environment...');
+
+        // Have AI introduce itself and report
+        setTimeout(() => {
+            const state = window.AIPlayerAPI ? window.AIPlayerAPI.getGameState() : null;
+            if (state) {
+                this.addChatMessage('AI', `I'm now in control. I see ${state.enemies.length} enemies in the area. My health is ${state.player.health}/${state.player.maxHealth}. Beginning tactical operations...`);
+            } else {
+                this.addChatMessage('AI', 'AI control activated, but game state unavailable. Waiting for game to start...');
+            }
+        }, 1000);
+    },
+
+    sendVisionToBackend: function() {
+        const visionCanvas = document.getElementById('ai-vision-canvas');
+        if (!visionCanvas) return;
+
+        try {
+            // Get current game state
+            const state = window.AIPlayerAPI ? window.AIPlayerAPI.getGameState() : null;
+
+            // Get screenshot as base64
+            const dataUrl = visionCanvas.toDataURL('image/png');
+
+            // Send to backend for analysis
+            this.sendToBackend({
+                type: 'screenshot',
+                image: dataUrl,
+                gameState: state,
+                timestamp: Date.now()
+            });
+
+            this.addThought('Vision data sent to AI backend for analysis...');
+        } catch (err) {
+            console.error('[AI Live Cam] Failed to send vision:', err);
+        }
     },
     
     stopAI: function() {
@@ -759,20 +1266,33 @@ const AILiveCam = {
         document.getElementById('ai-player-status').textContent = 'AI Inactive';
         document.querySelector('.ai-dot').classList.remove('active');
         this.aiPlayerActive = false;
-        
+
         // Stop AI loop
         if (this.aiLoopInterval) {
             clearInterval(this.aiLoopInterval);
             this.aiLoopInterval = null;
         }
-        
+
+        // Stop vision sending
+        if (this.visionSendInterval) {
+            clearInterval(this.visionSendInterval);
+            this.visionSendInterval = null;
+        }
+
         // Release all inputs and deactivate AI mode
         if (window.AIPlayerAPI) {
             window.AIPlayerAPI.deactivateAI();
             this.log('✓ AI control mode disabled', 'ai-success');
         }
-        
+
+        // Notify backend
+        this.sendToBackend({
+            type: 'control_toggle',
+            enabled: false
+        });
+
         this.log('AI player stopped', 'ai-action');
+        this.addThought('AI control deactivated. Manual control restored.');
     },
     
     resetStats: function() {
@@ -784,58 +1304,200 @@ const AILiveCam = {
     
     startAILoop: function() {
         if (this.aiLoopInterval) clearInterval(this.aiLoopInterval);
-        
+
+        // AI state tracking
+        this.aiState = {
+            lastShotTime: 0,
+            isInCombat: false,
+            coverSearchTime: 0,
+            lastReloadTime: 0,
+            currentTarget: null,
+            strafeDirection: 1,
+            strafeChangeTime: 0
+        };
+
         this.aiLoopInterval = setInterval(() => {
             if (!this.aiPlayerActive || !window.AIPlayerAPI) return;
-            
+
             // Get game state
             const state = window.AIPlayerAPI.getGameState();
             if (!state) return;
-            
-            // Simple AI behavior: move and look around
-            // Check for enemies
-            if (state.enemies && state.enemies.length > 0) {
-                // Find closest enemy
-                const closest = state.enemies.reduce((prev, curr) => 
-                    prev.distance < curr.distance ? prev : curr
-                );
-                
-                // Calculate look direction to enemy
-                const dx = closest.x - state.player.x;
-                const dz = closest.z - state.player.z;
-                const yaw = Math.atan2(dx, dz);
-                
-                // Look at enemy
-                window.AIPlayerAPI.setLook(yaw, 0);
-                
-                // Move toward enemy if far
-                if (closest.distance > 15) {
-                    window.AIPlayerAPI.setInput('moveForward', true);
-                } else {
-                    window.AIPlayerAPI.setInput('moveForward', false);
-                    window.AIPlayerAPI.setInput('moveBackward', true);
-                }
-                
-                // Shoot if aimed
-                window.AIPlayerAPI.setInput('fire', true);
-                
-                this.log(`🎯 Engaging enemy at ${closest.distance.toFixed(1)}m`, 'ai-combat');
-            } else {
-                // No enemies - explore
-                window.AIPlayerAPI.setInput('moveForward', true);
-                window.AIPlayerAPI.setInput('fire', false);
-            }
+
+            // Get difficulty settings
+            const difficulty = document.getElementById('ai-difficulty')?.value || 'medium';
+            const aggression = parseInt(document.getElementById('ai-aggression')?.value || 70) / 100;
+
+            // Enhanced AI behavior with tactics
+            this.performIntelligentAI(state, difficulty, aggression);
         }, 100);
+    },
+
+    performIntelligentAI: function(state, difficulty, aggression) {
+        const player = state.player;
+        const enemies = state.enemies;
+        const now = Date.now();
+
+        // Clear all inputs each frame
+        window.AIPlayerAPI.setInput('moveForward', false);
+        window.AIPlayerAPI.setInput('moveBackward', false);
+        window.AIPlayerAPI.setInput('moveLeft', false);
+        window.AIPlayerAPI.setInput('moveRight', false);
+        window.AIPlayerAPI.setInput('fire', false);
+        window.AIPlayerAPI.setInput('sprint', false);
+        window.AIPlayerAPI.setInput('crouch', false);
+
+        // Update AI state display
+        const healthPercent = (player.health / player.maxHealth) * 100;
+        const ammoPercent = player.reserveAmmo > 0 ? (player.ammo / 30) : 0;
+
+        // === TACTICAL DECISION TREE ===
+
+        // 1. CRITICAL: Low health - seek cover
+        if (healthPercent < 30) {
+            document.getElementById('ai-state').textContent = 'SEEKING COVER';
+            document.getElementById('ai-objective').textContent = 'Retreating - Low health!';
+
+            // Move backward and strafe
+            window.AIPlayerAPI.setInput('moveBackward', true);
+            window.AIPlayerAPI.setInput('sprint', true);
+            window.AIPlayerAPI.setInput('crouch', true);
+
+            // Strafe to make harder to hit
+            if (now - this.aiState.strafeChangeTime > 800) {
+                this.aiState.strafeDirection *= -1;
+                this.aiState.strafeChangeTime = now;
+            }
+            window.AIPlayerAPI.setInput(this.aiState.strafeDirection > 0 ? 'moveRight' : 'moveLeft', true);
+
+            this.log('⚠️ Low health! Seeking cover...', 'ai-combat');
+            return;
+        }
+
+        // 2. RELOAD: Low ammo
+        if (player.ammo < 5 && !player.isReloading && player.reserveAmmo > 0) {
+            if (now - this.aiState.lastReloadTime > 2000) {
+                document.getElementById('ai-state').textContent = 'RELOADING';
+                window.AIPlayerAPI.pressKey('reload');
+                this.aiState.lastReloadTime = now;
+                this.log('🔄 Reloading weapon', 'ai-action');
+            }
+        }
+
+        // 3. COMBAT: Engage enemies
+        if (enemies && enemies.length > 0) {
+            this.aiState.isInCombat = true;
+            document.getElementById('ai-state').textContent = 'COMBAT';
+
+            // Find closest enemy
+            const closest = enemies.reduce((prev, curr) =>
+                prev.distance < curr.distance ? prev : curr
+            );
+
+            this.aiState.currentTarget = closest;
+            document.getElementById('ai-target').textContent = `Enemy at ${closest.distance.toFixed(1)}m`;
+            document.getElementById('ai-objective').textContent = `Engaging hostile target`;
+
+            // Calculate look direction to enemy
+            const dx = closest.x - player.x;
+            const dz = closest.z - player.z;
+            const dy = closest.y - player.y;
+            const yaw = Math.atan2(dx, dz);
+            const distance = Math.sqrt(dx * dx + dz * dz);
+            const pitch = -Math.atan2(dy, distance);
+
+            // Look at enemy with difficulty-based accuracy
+            let aimYaw = yaw;
+            let aimPitch = pitch;
+
+            if (difficulty === 'easy') {
+                // Poor aim
+                aimYaw += (Math.random() - 0.5) * 0.3;
+                aimPitch += (Math.random() - 0.5) * 0.2;
+            } else if (difficulty === 'medium') {
+                // Decent aim
+                aimYaw += (Math.random() - 0.5) * 0.15;
+                aimPitch += (Math.random() - 0.5) * 0.1;
+            } else if (difficulty === 'hard') {
+                // Good aim
+                aimYaw += (Math.random() - 0.5) * 0.05;
+                aimPitch += (Math.random() - 0.5) * 0.03;
+            }
+            // Expert = perfect aim
+
+            window.AIPlayerAPI.setLook(aimYaw, aimPitch);
+
+            // Distance-based tactics
+            const optimalRange = 15 + (aggression * 10); // 15-25m based on aggression
+
+            if (closest.distance > optimalRange + 5) {
+                // Too far - advance
+                window.AIPlayerAPI.setInput('moveForward', true);
+                if (aggression > 0.7) {
+                    window.AIPlayerAPI.setInput('sprint', true);
+                }
+                this.log(`🎯 Advancing on enemy (${closest.distance.toFixed(1)}m)`, 'ai-combat');
+
+            } else if (closest.distance < optimalRange - 5) {
+                // Too close - back up
+                window.AIPlayerAPI.setInput('moveBackward', true);
+                this.log(`🎯 Creating distance from enemy (${closest.distance.toFixed(1)}m)`, 'ai-combat');
+
+            } else {
+                // Optimal range - strafe and shoot
+                if (now - this.aiState.strafeChangeTime > 1000) {
+                    this.aiState.strafeDirection *= -1;
+                    this.aiState.strafeChangeTime = now;
+                }
+                window.AIPlayerAPI.setInput(this.aiState.strafeDirection > 0 ? 'moveRight' : 'moveLeft', true);
+            }
+
+            // Shoot if aimed at target and have ammo
+            if (player.ammo > 0 && !player.isReloading) {
+                const angleToTarget = Math.abs(yaw - player.yaw);
+                const isAimed = angleToTarget < 0.2; // ~11 degrees
+
+                if (isAimed) {
+                    window.AIPlayerAPI.setInput('fire', true);
+                    if (now - this.aiState.lastShotTime > 200) {
+                        this.log(`🎯 Engaging enemy at ${closest.distance.toFixed(1)}m`, 'ai-combat');
+                        this.aiState.lastShotTime = now;
+                    }
+                }
+            }
+
+        } else {
+            // 4. EXPLORATION: No enemies - patrol
+            this.aiState.isInCombat = false;
+            document.getElementById('ai-state').textContent = 'EXPLORING';
+            document.getElementById('ai-target').textContent = 'None';
+            document.getElementById('ai-objective').textContent = 'Patrolling area';
+
+            // Move forward slowly
+            window.AIPlayerAPI.setInput('moveForward', true);
+
+            // Slowly rotate to scan area
+            const scanSpeed = 0.008;
+            const newYaw = player.yaw + scanSpeed;
+            window.AIPlayerAPI.setLook(newYaw, 0);
+
+            if (now - this.aiState.lastShotTime > 5000) {
+                this.log('🗺️ Area clear, continuing patrol', 'ai-action');
+                this.aiState.lastShotTime = now;
+            }
+        }
     },
     
     testConnection: function() {
-        this.log('Testing connection to AI server...', 'ai-action');
-        
+        this.log('Testing connections...', 'ai-action');
+
+        // Test game API
         if (window.AIPlayerAPI) {
             const state = window.AIPlayerAPI.getGameState();
             if (state) {
-                this.log('✓ Game state accessible', 'ai-success');
+                this.log('✓ Game API connected', 'ai-success');
                 this.log(`✓ Player at (${state.player.x.toFixed(1)}, ${state.player.z.toFixed(1)})`, 'ai-success');
+                this.log(`✓ Health: ${state.player.health.toFixed(0)}/${state.player.maxHealth}`, 'ai-success');
+                this.log(`✓ Ammo: ${state.player.ammo}/${state.player.reserveAmmo}`, 'ai-success');
                 this.log(`✓ ${state.enemies.length} enemies detected`, 'ai-success');
             } else {
                 this.log('✗ Game not active', 'ai-action');
@@ -843,6 +1505,27 @@ const AILiveCam = {
         } else {
             this.log('✗ AIPlayerAPI not found', 'ai-action');
         }
+
+        // Test WebSocket backend
+        if (this.wsConnected) {
+            this.log('✓ AI backend server connected', 'ai-success');
+            this.sendToBackend({
+                type: 'ping',
+                timestamp: Date.now()
+            });
+        } else {
+            this.log('✗ AI backend server offline (advanced AI features unavailable)', 'ai-action');
+            this.log('  Local AI is still functional', 'ai-action');
+        }
+
+        // Test renderer
+        if (window.renderer) {
+            this.log('✓ Game renderer available', 'ai-success');
+        } else {
+            this.log('✗ Game renderer not found', 'ai-action');
+        }
+
+        this.log('Connection test complete', 'ai-action');
     },
     
     log: function(message, type = '') {
