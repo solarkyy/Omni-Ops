@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Omni-Ops AI Chat Interface</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Courier New', monospace;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
+            color: #0f6;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .header {
+            background: rgba(0, 255, 102, 0.1);
+            border-bottom: 2px solid #0f6;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .header h1 {
+            font-size: 24px;
+            color: #0f6;
+            text-shadow: 0 0 10px #0f6;
+        }
+        
+        .status {
+            display: flex;
+            gap: 20px;
+            font-size: 12px;
+        }
+        
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #f00;
+            animation: pulse 2s infinite;
+        }
+        
+        .status-dot.connected {
+            background: #0f6;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .main-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+        
+        .sidebar {
+            width: 250px;
+            background: rgba(0, 255, 102, 0.05);
+            border-right: 1px solid #0f6;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        
+        .sidebar h3 {
+            color: #0f6;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+        
+        .quick-action {
+            background: rgba(0, 255, 102, 0.1);
+            border: 1px solid #0f6;
+            padding: 10px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            border-radius: 4px;
+        }
+        
+        .quick-action:hover {
+            background: rgba(0, 255, 102, 0.2);
+            transform: translateX(5px);
+        }
+        
+        .chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+        }
+        
+        .messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid #0f6;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .message {
+            margin-bottom: 20px;
+            animation: slideIn 0.3s ease-out;
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .message-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 5px;
+        }
+        
+        .message-icon {
+            font-size: 20px;
+        }
+        
+        .message-sender {
+            font-weight: bold;
+            color: #0f6;
+        }
+        
+        .message-time {
+            font-size: 10px;
+            color: #666;
+            margin-left: auto;
+        }
+        
+        .message-content {
+            background: rgba(0, 255, 102, 0.05);
+            padding: 15px;
+            border-left: 3px solid #0f6;
+            border-radius: 4px;
+            margin-left: 30px;
+            white-space: pre-wrap;
+            line-height: 1.6;
+        }
+        
+        .user-message .message-content {
+            background: rgba(0, 102, 255, 0.05);
+            border-left-color: #06f;
+        }
+        
+        .input-container {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .input-wrapper {
+            flex: 1;
+            position: relative;
+        }
+        
+        #messageInput {
+            width: 100%;
+            padding: 15px;
+            background: rgba(0, 255, 102, 0.1);
+            border: 2px solid #0f6;
+            border-radius: 8px;
+            color: #0f6;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            resize: none;
+            height: 60px;
+        }
+        
+        #messageInput:focus {
+            outline: none;
+            box-shadow: 0 0 20px rgba(0, 255, 102, 0.3);
+        }
+        
+        .send-button {
+            padding: 15px 30px;
+            background: #0f6;
+            color: #000;
+            border: none;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+        }
+        
+        .send-button:hover {
+            background: #0fa;
+            box-shadow: 0 0 20px rgba(0, 255, 102, 0.5);
+            transform: translateY(-2px);
+        }
+        
+        .send-button:active {
+            transform: translateY(0);
+        }
+        
+        .send-button:disabled {
+            background: #333;
+            color: #666;
+            cursor: not-allowed;
+        }
+        
+        .typing-indicator {
+            display: none;
+            color: #0f6;
+            font-style: italic;
+            padding: 10px;
+            animation: pulse 1.5s infinite;
+        }
+        
+        .typing-indicator.active {
+            display: block;
+        }
+        
+        ::-webkit-scrollbar {
+            width: 10px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.3);
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #0f6;
+            border-radius: 5px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: #0fa;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🤖 OMNI-OPS AI ASSISTANT</h1>
+        <div class="status">
+            <div class="status-item">
+                <div class="status-dot" id="bridgeStatus"></div>
+                <span>Bridge</span>
+            </div>
+            <div class="status-item">
+                <div class="status-dot" id="connectorStatus"></div>
+                <span>Connector</span>
+            </div>
+        </div>
+    </div>
+    
+    <div class="main-container">
+        <div class="sidebar">
+            <h3>⚡ QUICK ACTIONS</h3>
+            <div class="quick-action" onclick="quickQuery('Scan codebase for issues')">
+                🔍 Scan for Issues
+            </div>
+            <div class="quick-action" onclick="quickQuery('Analyze js/omni-core-game.js')">
+                📊 Analyze Core Game
+            </div>
+            <div class="quick-action" onclick="quickQuery('What are the main features?')">
+                💡 Show Features
+            </div>
+            <div class="quick-action" onclick="quickQuery('How do NPCs work?')">
+                🤖 Explain NPCs
+            </div>
+            <div class="quick-action" onclick="quickQuery('Suggest performance improvements')">
+                ⚡ Optimize Performance
+            </div>
+            <div class="quick-action" onclick="quickQuery('Test NPC GUARD decision making')">
+                🛡️ Test Guard AI
+            </div>
+            <div class="quick-action" onclick="quickQuery('Test NPC TRADER decision making')">
+                💰 Test Trader AI
+            </div>
+            <div class="quick-action" onclick="quickQuery('Show workspace info')">
+                📁 Workspace Info
+            </div>
+        </div>
+        
+        <div class="chat-container">
+            <div class="messages" id="messages">
+                <div class="message">
+                    <div class="message-header">
+                        <span class="message-icon">🤖</span>
+                        <span class="message-sender">AI Assistant</span>
+                        <span class="message-time" id="startTime"></span>
+                    </div>
+                    <div class="message-content">Welcome to the Omni-Ops AI Assistant!
+
+I can help you with:
+• Code analysis and debugging
+• Performance optimization
+• Feature implementation guidance
+• NPC behavior and AI systems
+• Workspace scanning and improvements
+
+Ask me anything about your codebase, or use the quick actions on the left!</div>
+                </div>
+            </div>
+            
+            <div class="typing-indicator" id="typingIndicator">
+                🤖 AI is thinking...
+            </div>
+            
+            <div class="input-container">
+                <div class="input-wrapper">
+                    <textarea 
+                        id="messageInput" 
+                        placeholder="Ask me anything about your code..."
+                        onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault();sendMessage();}"
+                    ></textarea>
+                </div>
+                <button class="send-button" onclick="sendMessage()">Send</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const BRIDGE_URL = 'http://localhost:5000';
+        let bridgeConnected = false;
+        
+        // Set start time
+        document.getElementById('startTime').textContent = new Date().toLocaleTimeString();
+        
+        // Check bridge status
+        async function checkBridgeStatus() {
+            try {
+                const response = await fetch(`${BRIDGE_URL}/health`);
+                const data = await response.json();
+                bridgeConnected = data.status === 'healthy';
+                document.getElementById('bridgeStatus').classList.toggle('connected', bridgeConnected);
+                document.getElementById('connectorStatus').classList.add('connected'); // Always connected locally
+            } catch (error) {
+                bridgeConnected = false;
+                document.getElementById('bridgeStatus').classList.remove('connected');
+            }
+        }
+        
+        // Check status on load and periodically
+        checkBridgeStatus();
+        setInterval(checkBridgeStatus, 5000);
+        
+        function addMessage(sender, content, isUser = false) {
+            const messagesDiv = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message' + (isUser ? ' user-message' : '');
+            
+            const time = new Date().toLocaleTimeString();
+            const icon = isUser ? '👤' : '🤖';
+            
+            messageDiv.innerHTML = `
+                <div class="message-header">
+                    <span class="message-icon">${icon}</span>
+                    <span class="message-sender">${sender}</span>
+                    <span class="message-time">${time}</span>
+                </div>
+                <div class="message-content">${content}</div>
+            `;
+            
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+        
+        function showTyping(show) {
+            document.getElementById('typingIndicator').classList.toggle('active', show);
+        }
+        
+        async function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const message = input.value.trim();
+            
+            if (!message) return;
+            
+            // Add user message
+            addMessage('You', message, true);
+            input.value = '';
+            
+            // Show typing indicator
+            showTyping(true);
+            
+            try {
+                if (bridgeConnected) {
+                    // Send to bridge
+                    const response = await fetch(`${BRIDGE_URL}/query`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ query: message, include_context: false })
+                    });
+                    
+                    const data = await response.json();
+                    showTyping(false);
+                    
+                    if (data.status === 'success') {
+                        addMessage('AI Assistant', data.response);
+                    } else {
+                        addMessage('AI Assistant', `Error: ${data.error}`);
+                    }
+                } else {
+                    // Local fallback
+                    showTyping(false);
+                    addMessage('AI Assistant', `Bridge not connected. Start the bridge with:\n\npython ai_collaborative_bridge.py\n\nLocal response: I can see your question about "${message}". Once the bridge is running, I'll be able to provide full AI-powered assistance!`);
+                }
+            } catch (error) {
+                showTyping(false);
+                addMessage('AI Assistant', `Connection error: ${error.message}\n\nMake sure the AI bridge is running:\npython ai_collaborative_bridge.py`);
+            }
+        }
+        
+        function quickQuery(query) {
+            document.getElementById('messageInput').value = query;
+            sendMessage();
+        }
+        
+        // Focus input on load
+        document.getElementById('messageInput').focus();
+    </script>
+</body>
+</html>
