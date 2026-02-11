@@ -9,6 +9,7 @@ const ModuleLoader = {
         { name: 'UE5 Editor', file: 'js/omni-ue5-editor.js', required: true },
         { name: 'Pip-Boy System', file: 'js/omni-pipboy-system.js', required: true },
         { name: 'Living NPC City', file: 'js/omni-npc-living-city.js', required: true },
+        { name: 'AI Testing Interface', file: 'js/omni-ai-tester.js', required: false },
         { name: 'Integration Layer', file: 'js/omni-integration.js', required: true }
     ],
     loaded: 0,
@@ -142,6 +143,36 @@ const ModuleLoader = {
                         try {
                             window.initializeUI();
                             console.log('[ModuleLoader] ✓ initializeUI completed successfully');
+                            
+                            // Initialize AI Vision & Brain Systems
+                            setTimeout(() => {
+                                try {
+                                    // Initialize in-game AI intelligence
+                                    if (window.initializeInGameAI && window.game) {
+                                        const ai = window.initializeInGameAI(window.game);
+                                        console.log('[ModuleLoader] ✓ In-Game AI Intelligence initialized');
+                                    }
+                                    
+                                    // Initialize Vision Brain Panel for external AI communication
+                                    if (window.initializeVisionBrainPanel) {
+                                        window.initializeVisionBrainPanel();
+                                        console.log('[ModuleLoader] ✓ Vision Brain Panel initialized');
+                                    }
+                                    
+                                    // Setup keybinding for Vision Brain Panel (F5)
+                                    document.addEventListener('keydown', (e) => {
+                                        if (e.key === 'F5' && !e.repeat) {
+                                            if (window.AIVisionBrainPanel) {
+                                                window.AIVisionBrainPanel.toggle();
+                                            }
+                                        }
+                                    });
+                                    
+                                    console.log('[ModuleLoader] ✓ AI Vision & Brain Systems fully initialized');
+                                } catch (aiErr) {
+                                    console.warn('[ModuleLoader] AI systems initialization warning (non-critical):', aiErr);
+                                }
+                            }, 1000);
                         } catch (initErr) {
                             console.error('[ModuleLoader] Error calling initializeUI:', initErr);
                             if (initErr.stack) console.error(initErr.stack);
@@ -301,10 +332,3 @@ window.editorExport = function () {
     // Add logic to export the game world as JSON
 };
 
-// Event Listeners
-document.addEventListener('keydown', (e) => {
-    if (e.key === 'F2') {
-        e.preventDefault();
-        window.toggleEditor();
-    }
-});

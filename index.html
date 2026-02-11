@@ -56,6 +56,19 @@
         .dialogue-option{background:rgba(0,255,100,0.1);border:1px solid #0f6;color:#0f6;padding:12px;margin:8px 0;cursor:pointer;border-radius:5px;font-size:13px;transition:all 0.2s;text-align:left}
         .dialogue-option:hover{background:rgba(0,255,100,0.3);box-shadow:0 0 10px #0f6;transform:translateX(5px)}
         .dialogue-option.selected{background:rgba(0,255,100,0.5);box-shadow:0 0 15px #0f6;border:2px solid #0f6}
+        
+        /* Settings Styles */
+        .settings-tab{background:#1a1a1a;color:#0f6;border:none;border-bottom:3px solid transparent;padding:10px 20px;cursor:pointer;font-size:14px;font-weight:bold;transition:all 0.3s}
+        .settings-tab:hover{background:#0f6;color:#000}
+        .settings-tab.active{border-bottom-color:#0f6;background:#0a3a0a}
+        .settings-tab-content{color:#0f6}
+        .keybind-item{display:flex;flex-direction:column;padding:10px;background:rgba(0,255,100,0.05);border:1px solid #0f6;border-radius:5px;gap:5px}
+        .keybind-label{font-weight:bold;font-size:12px;opacity:0.8}
+        .keybind-button{background:#0a3a0a;color:#0f6;border:2px solid #0f6;padding:8px 12px;border-radius:5px;cursor:pointer;font-family:monospace;font-weight:bold;transition:all 0.2s;font-size:13px}
+        .keybind-button:hover{background:#0f6;color:#000;box-shadow:0 0 10px #0f6}
+        .keybind-button.listening{background:#ff0;color:#000;animation:pulse 0.5s infinite}
+        @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.6}}
+        input[type="range"]{accent-color:#0f6}
     </style>
 </head>
 <body>
@@ -78,6 +91,7 @@
             <button id="btn-single" class="menu-btn">🎮 Quick Play</button>
             <button id="btn-show-host" class="menu-btn">🌐 New Game (Host)</button>
             <button id="btn-show-join" class="menu-btn">🔗 Join Game</button>
+            <button id="btn-main-settings" class="menu-btn secondary">⚙️ Settings</button>
             <div id="btn-resume" style="display:none;" class="menu-btn">▶️ Resume Game</div>
         </div>
         
@@ -113,10 +127,87 @@
         </div>
 
         <div id="settings-screen" class="menu-screen" style="display:none;">
-            <div class="menu-title">Settings</div>
-            <div style="color:#0f6; margin:20px 0;">Game running in background</div>
-            <button id="btn-settings-resume" class="menu-btn">▶️ Resume Game</button>
-            <button id="btn-quit" class="menu-btn">Quit to Menu</button>
+            <div class="menu-title">⚙️ Settings</div>
+            
+            <!-- Settings Tabs -->
+            <div style="display:flex; gap:10px; margin:20px 0; border-bottom:2px solid #0f6;">
+                <button class="settings-tab active" data-tab="controls">🎮 Controls</button>
+                <button class="settings-tab" data-tab="graphics">🖥️ Graphics</button>
+                <button class="settings-tab" data-tab="audio">🔊 Audio</button>
+                <button class="settings-tab" data-tab="gameplay">⚔️ Gameplay</button>
+            </div>
+            
+            <!-- Controls Tab -->
+            <div id="tab-controls" class="settings-tab-content" style="max-height:400px; overflow-y:auto; padding:10px 0;">
+                <h3 style="color:#0f6; margin:10px 0;">Key Bindings</h3>
+                <div id="keybind-list" style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; font-size:13px;">
+                    <!-- Will be populated by JavaScript -->
+                </div>
+                <div style="margin-top:20px;">
+                    <button id="btn-reset-controls" class="menu-btn secondary" style="width:auto; padding:10px 20px;">Reset to Defaults</button>
+                </div>
+            </div>
+            
+            <!-- Graphics Tab -->
+            <div id="tab-graphics" class="settings-tab-content" style="display:none; padding:10px 0;">
+                <h3 style="color:#0f6; margin:10px 0;">Graphics Settings</h3>
+                <div style="display:flex; flex-direction:column; gap:15px; font-size:13px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <label style="color:#0f6;">Mouse Sensitivity:</label>
+                        <input type="range" id="mouse-sensitivity" min="0.0005" max="0.005" step="0.0001" value="0.002" style="width:200px;">
+                        <span id="mouse-sens-value" style="color:#0f6; width:60px;">0.002</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <label style="color:#0f6;">Field of View:</label>
+                        <input type="range" id="fov-slider" min="60" max="120" step="5" value="85" style="width:200px;">
+                        <span id="fov-value" style="color:#0f6; width:60px;">85°</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <label style="color:#0f6;">High Quality Graphics:</label>
+                        <input type="checkbox" id="hifi-toggle" checked style="transform:scale(1.5);">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Audio Tab -->
+            <div id="tab-audio" class="settings-tab-content" style="display:none; padding:10px 0;">
+                <h3 style="color:#0f6; margin:10px 0;">Audio Settings</h3>
+                <div style="display:flex; flex-direction:column; gap:15px; font-size:13px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <label style="color:#0f6;">Master Volume:</label>
+                        <input type="range" id="master-volume" min="0" max="1" step="0.1" value="1" style="width:200px;">
+                        <span id="volume-value" style="color:#0f6; width:60px;">100%</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <label style="color:#0f6;">SFX Volume:</label>
+                        <input type="range" id="sfx-volume" min="0" max="1" step="0.1" value="1" style="width:200px;">
+                        <span id="sfx-value" style="color:#0f6; width:60px;">100%</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Gameplay Tab -->
+            <div id="tab-gameplay" class="settings-tab-content" style="display:none; padding:10px 0;">
+                <h3 style="color:#0f6; margin:10px 0;">Gameplay Settings</h3>
+                <div style="display:flex; flex-direction:column; gap:15px; font-size:13px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <label style="color:#0f6;">Move Speed:</label>
+                        <input type="range" id="move-speed" min="5" max="15" step="1" value="8" style="width:200px;">
+                        <span id="speed-value" style="color:#0f6; width:60px;">8</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <label style="color:#0f6;">Sprint Speed:</label>
+                        <input type="range" id="sprint-speed" min="15" max="40" step="1" value="28" style="width:200px;">
+                        <span id="sprint-value" style="color:#0f6; width:60px;">28</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="margin-top:20px; display:flex; gap:10px;">
+                <button id="btn-settings-resume" class="menu-btn">▶️ Resume Game</button>
+                <button id="btn-settings-back" class="menu-btn secondary">← Back to Menu</button>
+                <button id="btn-quit" class="menu-btn secondary">Quit to Menu</button>
+            </div>
         </div>
     </div>
 
@@ -327,6 +418,21 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <!-- AI Game Bridge - HTTP API for Python AI -->
+    <script src="js/omni-ai-game-bridge.js" defer></script>
+    <!-- Game HTTP API Server - Exposes endpoints for Python communication -->
+    <script src="js/omni-game-http-api.js" defer></script>
+    <!-- New Unified Control Panel - Consolidated tabbed UI -->
+    <script src="js/omni-unified-control-panel.js" defer></script>
+    <!-- AI Vision & Brain Communication -->
+    <script src="js/omni-in-game-ai-intelligence.js" defer></script>
+    <!-- AI Testing & Monitoring -->
+    <script src="js/omni-ai-tester.js" defer></script>
+    <script src="js/omni-ai-livecam-v2.js" defer></script>
+    <!-- Unified AI Collaboration Panel (Combines chat, livecam, vision brain, controls) -->
+    <script src="js/omni-ai-unified-panel.js" defer></script>
+    <script src="js/omni-ai-collaboration.js" defer></script>
+    <script src="js/omni-smart-ai-helper.js" defer></script>
     <script>
         // Global logging to page for debugging
         window.pageLog = [];

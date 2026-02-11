@@ -451,7 +451,8 @@ python personal_assistant.py
 1. Fix memory leaks TODAY (30 min)
 2. Add error handling TODAY (1 hour)
 3. Test thoroughly TOMORROW (2 hours)
-4. Deploy after verification
+4. Deploy after 
+verification
 
 ---
 

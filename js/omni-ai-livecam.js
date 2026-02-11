@@ -12,12 +12,53 @@ const AILiveCam = {
     statsInterval: null,
     thoughtUpdateInterval: null,
     serverUrl: 'http://localhost:8080',
-    
+    ws: null,
+    wsConnected: false,
+    lastThoughts: [],
+
     init: function() {
         console.log('[AI Live Cam] Creating UI...');
+        this.createButton();
         this.createUI();
         this.setupKeys();
         this.setupStyles();
+        this.connectToVisionBrain();
+    },
+
+    createButton: function() {
+        // Create live cam button
+        const liveCamButton = document.createElement('button');
+        liveCamButton.id = 'livecam-btn';
+        liveCamButton.innerHTML = '📹 AI LIVE CAM (F4)';
+        liveCamButton.style.cssText = `
+            position: fixed;
+            top: 50px;
+            right: 10px;
+            z-index: 600;
+            padding: 8px 15px;
+            background: #0a0a3a;
+            color: #0af;
+            border: 2px solid #0af;
+            border-radius: 5px;
+            font-weight: bold;
+            cursor: pointer;
+            font-family: monospace;
+            font-size: 12px;
+            transition: all 0.2s;
+            box-shadow: 0 0 10px rgba(0,170,255,0.3);
+        `;
+        liveCamButton.onmouseover = () => {
+            liveCamButton.style.background = '#0af';
+            liveCamButton.style.color = '#000';
+            liveCamButton.style.boxShadow = '0 0 20px rgba(0,170,255,0.6)';
+        };
+        liveCamButton.onmouseout = () => {
+            liveCamButton.style.background = '#0a0a3a';
+            liveCamButton.style.color = '#0af';
+            liveCamButton.style.boxShadow = '0 0 10px rgba(0,170,255,0.3)';
+        };
+        liveCamButton.onclick = () => this.toggle();
+        document.body.appendChild(liveCamButton);
     },
     
     createUI: function() {
@@ -26,7 +67,7 @@ const AILiveCam = {
                 <div class="ai-livecam-container">
                     <!-- Header -->
                     <div class="ai-livecam-header">
-                        <div class="ai-livecam-title">📹 AI LIVE CAM - Watch AI Play</div>
+                        <div class="ai-livecam-title">📹 AI LIVE CAM - Watch & Direct AI</div>
                         <div class="ai-status-indicator">
                             <span class="ai-dot" id="ai-player-dot"></span>
                             <span id="ai-player-status">AI Inactive</span>
@@ -58,7 +99,7 @@ const AILiveCam = {
                                 <div class="radar-box">
                                     <canvas id="ai-radar-canvas" width="300" height="300"></canvas>
                                     <div class="radar-legend">
-                                        <span>🟢 Player</span>
+                                        <span>� Player</span>
                                         <span>🔴 Enemies</span>
                                         <span>⚪ Objects</span>
                                     </div>
@@ -92,7 +133,23 @@ const AILiveCam = {
                                 <div class="panel-title">💭 AI THOUGHTS</div>
                                 <div id="ai-thoughts" class="thoughts-stream"></div>
                             </div>
-                            
+
+                            <!-- AI Chat -->
+                            <div class="ai-chat-panel">
+                                <div class="panel-title">💬 CHAT WITH AI</div>
+                                <div id="ai-chat-messages" class="chat-messages-live"></div>
+                                <div class="chat-input-container">
+                                    <input type="text" id="ai-chat-input-live" placeholder="Give AI directives... (e.g., 'Find cover', 'Attack enemy')" autocomplete="off">
+                                    <button id="ai-chat-send-live" class="chat-send-btn">SEND</button>
+                                </div>
+                                <div class="quick-commands-chat">
+                                    <button class="quick-cmd-btn" data-cmd="Find cover">�️ Find Cover</button>
+                                    <button class="quick-cmd-btn" data-cmd="Attack enemy">⚔️ Attack</button>
+                                    <button class="quick-cmd-btn" data-cmd="Retreat">🏃 Retreat</button>
+                                    <button class="quick-cmd-btn" data-cmd="Hold position">🎯 Hold</button>
+                                </div>
+                            </div>
+
                             <!-- Statistics -->
                             <div class="ai-stats-panel">
                                 <div class="panel-title">📊 PERFORMANCE</div>
@@ -192,23 +249,118 @@ const AILiveCam = {
                 </div>
             </div>
         `;
-        
+
         document.body.insertAdjacentHTML('beforeend', html);
-        
+
         // Setup sliders
         const aggressionSlider = document.getElementById('ai-aggression');
         const updateSlider = document.getElementById('ai-update-rate');
-        
+
         if (aggressionSlider) {
             aggressionSlider.oninput = (e) => {
                 document.getElementById('ai-aggression-val').textContent = e.target.value + '%';
             };
         }
-        
+
         if (updateSlider) {
             updateSlider.oninput = (e) => {
                 document.getElementById('ai-update-val').textContent = e.target.value + 'ms';
             };
+        }
+
+        // Setup chat functionality
+        this.setupChatHandlers();
+    },
+
+    setupChatHandlers: function() {
+        // Chat send button
+        const sendBtn = document.getElementById('ai-chat-send-live');
+        if (sendBtn) {
+            sendBtn.onclick = () => this.sendChatDirective();
+        }
+
+        // Chat input enter key
+        const chatInput = document.getElementById('ai-chat-input-live');
+        if (chatInput) {
+            chatInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    this.sendChatDirective();
+                }
+            });
+        }
+
+        // Quick command buttons
+        document.querySelectorAll('.quick-cmd-btn').forEach(btn => {
+            btn.onclick = () => {
+                const cmd = btn.getAttribute('data-cmd');
+                if (cmd) {
+                    const chatInput = document.getElementById('ai-chat-input-live');
+                    if (chatInput) {
+                        chatInput.value = cmd;
+                        this.sendChatDirective();
+                    }
+                }
+            };
+        });
+    },
+
+    sendChatDirective: function() {
+        const chatInput = document.getElementById('ai-chat-input-live');
+        if (!chatInput) return;
+
+        const message = chatInput.value.trim();
+        if (!message) return;
+
+        // Add message to chat display
+        this.addChatMessage('user', message);
+
+        // Send via WebSocket if connected
+        if (this.wsConnected && this.ws) {
+            this.ws.send(JSON.stringify({
+                type: 'user_directive',
+                directive: message,
+                timestamp: Date.now()
+            }));
+        }
+
+        // Also log it as an instruction
+        this.log(`📢 Directive sent: ${message}`, 'ai-action');
+        this.addThought(`User directive: ${message}`, 'command');
+
+        // Clear input
+        chatInput.value = '';
+    },
+
+    addChatMessage: function(sender, message, timestamp) {
+        const chatMessages = document.getElementById('ai-chat-messages');
+        if (!chatMessages) return;
+
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `chat-msg-live ${sender}`;
+
+        const time = timestamp ? new Date(timestamp).toLocaleTimeString() : new Date().toLocaleTimeString();
+
+        const senderNames = {
+            'user': 'YOU',
+            'ai': 'AI',
+            'external': 'EXTERNAL AI',
+            'system': 'SYSTEM'
+        };
+
+        messageDiv.innerHTML = `
+            <div class="msg-header-live">
+                <span class="msg-sender-live">${senderNames[sender] || sender.toUpperCase()}</span>
+                <span class="msg-time-live">${time}</span>
+            </div>
+            <div class="msg-content-live">${message}</div>
+        `;
+
+        chatMessages.appendChild(messageDiv);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+
+        // Keep last 50 messages
+        while (chatMessages.children.length > 50) {
+            chatMessages.removeChild(chatMessages.firstChild);
         }
     },
     
@@ -575,21 +727,167 @@ const AILiveCam = {
             .debug-line span {
                 color: #0ff;
             }
+
+            /* Chat message styles */
+            .chat-messages-live {
+                max-height: 250px;
+                overflow-y: auto;
+                margin-bottom: 10px;
+            }
+
+            .chat-msg-live {
+                padding: 8px 10px;
+                margin-bottom: 8px;
+                border-radius: 8px;
+                border-left: 3px solid;
+                animation: slideIn 0.3s ease-out;
+            }
+
+            @keyframes slideIn {
+                from {
+                    opacity: 0;
+                    transform: translateX(-10px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateX(0);
+                }
+            }
+
+            .chat-msg-live.user {
+                border-left-color: #0af;
+                background: rgba(0, 170, 255, 0.15);
+            }
+
+            .chat-msg-live.ai {
+                border-left-color: #0f6;
+                background: rgba(0, 255, 100, 0.15);
+            }
+
+            .chat-msg-live.external {
+                border-left-color: #f90;
+                background: rgba(255, 153, 0, 0.15);
+            }
+
+            .chat-msg-live.system {
+                border-left-color: #888;
+                background: rgba(136, 136, 136, 0.1);
+                text-align: center;
+                font-size: 11px;
+                color: #aaa;
+            }
+
+            .msg-header-live {
+                display: flex;
+                justify-content: space-between;
+                margin-bottom: 4px;
+            }
+
+            .msg-sender-live {
+                font-weight: bold;
+                font-size: 11px;
+            }
+
+            .chat-msg-live.user .msg-sender-live { color: #0af; }
+            .chat-msg-live.ai .msg-sender-live { color: #0f6; }
+            .chat-msg-live.external .msg-sender-live { color: #f90; }
+
+            .msg-time-live {
+                font-size: 9px;
+                color: #888;
+            }
+
+            .msg-content-live {
+                font-size: 12px;
+                line-height: 1.4;
+                color: #fff;
+            }
+
+            .chat-input-container {
+                display: flex;
+                gap: 8px;
+                margin-top: 10px;
+            }
+
+            #ai-chat-input-live {
+                flex: 1;
+                padding: 8px 10px;
+                background: rgba(0, 0, 0, 0.5);
+                border: 2px solid #0f6;
+                border-radius: 5px;
+                color: #fff;
+                font-family: 'Courier New', monospace;
+                font-size: 12px;
+            }
+
+            #ai-chat-input-live:focus {
+                outline: none;
+                border-color: #0ff;
+                box-shadow: 0 0 10px rgba(0, 255, 100, 0.3);
+            }
+
+            .chat-send-btn {
+                padding: 8px 15px;
+                background: #0f6;
+                border: none;
+                border-radius: 5px;
+                color: #000;
+                font-weight: bold;
+                cursor: pointer;
+                font-family: 'Courier New', monospace;
+                font-size: 12px;
+                transition: all 0.2s;
+            }
+
+            .chat-send-btn:hover {
+                background: #0ff;
+                box-shadow: 0 0 15px rgba(0, 255, 100, 0.5);
+            }
+
+            .quick-commands-chat {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 6px;
+                margin-top: 10px;
+            }
+
+            .quick-cmd-btn {
+                padding: 8px;
+                background: rgba(0, 255, 100, 0.1);
+                border: 1px solid #0f6;
+                border-radius: 5px;
+                color: #0f6;
+                font-size: 10px;
+                cursor: pointer;
+                transition: all 0.2s;
+                font-family: 'Courier New', monospace;
+                font-weight: bold;
+            }
+
+            .quick-cmd-btn:hover {
+                background: #0f6;
+                color: #000;
+                transform: translateY(-2px);
+                box-shadow: 0 4px 10px rgba(0, 255, 100, 0.4);
+            }
+
+            .ai-chat-panel {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                min-height: 0;
+            }
         `;
-        
+
         document.head.appendChild(style);
     },
     
     setupKeys: function() {
         const handler = (e) => {
-            // F3 or F4 both open the unified interface
-            if (e.code === 'F3' || e.code === 'F4') {
+            // F4 opens live cam only
+            if (e.code === 'F4') {
                 e.preventDefault();
                 this.toggle();
-                // Also toggle the testing interface if available
-                if (window.AITester && window.AITester.toggle) {
-                    window.AITester.toggle();
-                }
                 return true;
             }
             return false;
@@ -609,15 +907,18 @@ const AILiveCam = {
     toggle: function() {
         this.active = !this.active;
         const overlay = document.getElementById('ai-livecam-overlay');
+        const button = document.getElementById('livecam-btn');
         if (overlay) {
             if (this.active) {
                 overlay.classList.remove('ai-livecam-hidden');
+                if (button) button.style.opacity = '0.6';
                 this.startUpdates();
                 if (typeof document.exitPointerLock === 'function') {
                     document.exitPointerLock();
                 }
             } else {
                 overlay.classList.add('ai-livecam-hidden');
+                if (button) button.style.opacity = '1';
                 this.stopUpdates();
                 if (window.isGameActive && typeof window.safeRequestPointerLock === 'function') {
                     window.safeRequestPointerLock();
@@ -640,36 +941,301 @@ const AILiveCam = {
     
     updateDisplay: function() {
         if (!window.AIPlayerAPI) return;
-        
+
         const state = window.AIPlayerAPI.getGameState();
         if (!state) return;
-        
+
+        // Capture game viewport and draw to AI vision canvas
+        this.renderGameView();
+
         // Update debug info
-        document.getElementById('debug-pos').textContent = 
+        document.getElementById('debug-pos').textContent =
             `${state.player.x.toFixed(1)}, ${state.player.y.toFixed(1)}, ${state.player.z.toFixed(1)}`;
-        document.getElementById('debug-look').textContent = 
+        document.getElementById('debug-look').textContent =
             `${(state.player.yaw * 180 / Math.PI).toFixed(0)}°, ${(state.player.pitch * 180 / Math.PI).toFixed(0)}°`;
-        document.getElementById('debug-vel').textContent = 
+        document.getElementById('debug-vel').textContent =
             `${state.player.velocity.x.toFixed(2)}, ${state.player.velocity.y.toFixed(2)}, ${state.player.velocity.z.toFixed(2)}`;
         document.getElementById('debug-enemies').textContent = state.enemies.length;
-        
+
         // Draw radar
         this.drawRadar(state);
+    },
+
+    renderGameView: function() {
+        const visionCanvas = document.getElementById('ai-vision-canvas');
+        if (!visionCanvas) return;
+
+        const ctx = visionCanvas.getContext('2d');
+
+        // Find the main game canvas - try multiple methods
+        let gameCanvas = null;
+
+        // Method 1: Check if we have a cached reference
+        if (window.omni && window.omni.gameCanvas) {
+            gameCanvas = window.omni.gameCanvas;
+        }
+
+        // Method 2: Look for THREE.js renderer canvas
+        if (!gameCanvas && window.renderer && window.renderer.domElement) {
+            gameCanvas = window.renderer.domElement;
+        }
+
+        // Method 3: Search all canvases, prioritizing large ones
+        if (!gameCanvas) {
+            const allCanvases = document.querySelectorAll('canvas');
+            let largestCanvas = null;
+            let largestArea = 0;
+
+            allCanvases.forEach(canvas => {
+                // Skip our own canvases
+                if (canvas === visionCanvas ||
+                    canvas.id === 'ai-radar-canvas' ||
+                    canvas.id === 'minimap-canvas') {
+                    return;
+                }
+
+                // Check canvas dimensions - use clientWidth/clientHeight for display size
+                const area = canvas.clientWidth * canvas.clientHeight;
+                if (area > largestArea) {
+                    largestArea = area;
+                    largestCanvas = canvas;
+                }
+            });
+
+            if (largestCanvas && largestArea > 100000) { // Require at least reasonable size
+                gameCanvas = largestCanvas;
+            }
+        }
+
+        if (!gameCanvas) {
+            // No game canvas found - show clear error message
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, visionCanvas.width, visionCanvas.height);
+            ctx.fillStyle = '#00d9ff';
+            ctx.font = '12px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('NO GAME CANVAS FOUND', visionCanvas.width / 2, visionCanvas.height / 2 - 20);
+            ctx.fillStyle = '#0f6';
+            ctx.font = '10px monospace';
+            ctx.fillText('Tried: window.renderer, cached ref, canvas search', visionCanvas.width / 2, visionCanvas.height / 2);
+            ctx.fillText('Game must be loaded and rendering', visionCanvas.width / 2, visionCanvas.height / 2 + 15);
+            return;
+        }
+
+        try {
+            // Draw the game canvas to the vision canvas (scaled down)
+            ctx.drawImage(gameCanvas, 0, 0, visionCanvas.width, visionCanvas.height);
+
+            // Add a subtle border to indicate live feed
+            ctx.strokeStyle = '#0f6';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(1, 1, visionCanvas.width - 2, visionCanvas.height - 2);
+
+            // Update target indicator
+            const targetIndicator = document.getElementById('ai-target-indicator');
+            if (targetIndicator) {
+                targetIndicator.textContent = 'LIVE FEED';
+                targetIndicator.style.background = 'rgba(0, 255, 100, 0.8)';
+            }
+
+            // Store reference for future use
+            window.omni = window.omni || {};
+            window.omni.gameCanvas = gameCanvas;
+        } catch (e) {
+            // If direct copy fails, show error
+            ctx.fillStyle = '#111';
+            ctx.fillRect(0, 0, visionCanvas.width, visionCanvas.height);
+            ctx.fillStyle = '#f44';
+            ctx.font = '11px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('Canvas Capture Error: ' + e.message, visionCanvas.width / 2, visionCanvas.height / 2 - 10);
+            ctx.fillStyle = '#0f6';
+            ctx.font = '10px monospace';
+            ctx.fillText('Canvas found but drawing failed', visionCanvas.width / 2, visionCanvas.height / 2 + 10);
+        }
     },
     
     updateStats: function() {
         if (!window.AIPlayerAPI) return;
-        
+
         const state = window.AIPlayerAPI.getGameState();
         if (!state) return;
-        
+
         document.getElementById('stat-health').textContent = Math.floor(state.player.health);
         document.getElementById('stat-ammo').textContent = `${state.player.ammo}/${state.player.reserveAmmo}`;
         document.getElementById('stat-enemies').textContent = state.enemies.length;
     },
-    
+
+    connectToVisionBrain: function() {
+        console.log('[AI Live Cam] Connecting to Vision Brain Bridge...');
+
+        try {
+            this.ws = new WebSocket('ws://localhost:8082');
+
+            this.ws.onopen = () => {
+                this.wsConnected = true;
+                console.log('[AI Live Cam] ✅ Connected to Vision Brain Bridge');
+                this.addThought('Connected to Vision Brain Bridge', 'system');
+
+                // Announce connection
+                this.ws.send(JSON.stringify({
+                    type: 'ai_connected',
+                    name: 'AI_Live_Cam',
+                    capabilities: ['vision_display', 'monitoring']
+                }));
+            };
+
+            this.ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    this.handleVisionBrainMessage(data);
+                } catch (error) {
+                    console.error('[AI Live Cam] Failed to parse message:', error);
+                }
+            };
+
+            this.ws.onerror = (error) => {
+                console.error('[AI Live Cam] WebSocket error:', error);
+                this.wsConnected = false;
+            };
+
+            this.ws.onclose = () => {
+                console.log('[AI Live Cam] Disconnected from Vision Brain Bridge. Retrying in 5s...');
+                this.wsConnected = false;
+                this.addThought('Disconnected from Vision Brain', 'error');
+                setTimeout(() => this.connectToVisionBrain(), 5000);
+            };
+        } catch (error) {
+            console.error('[AI Live Cam] Failed to connect to Vision Brain:', error);
+            this.addThought('Failed to connect to Vision Brain - Is it running?', 'error');
+        }
+    },
+
+    handleVisionBrainMessage: function(data) {
+        const { type } = data;
+
+        switch(type) {
+            case 'vision_frame':
+                // Vision data received
+                break;
+            case 'decision_made':
+                this.addThought(`Decision: ${data.decision} (confidence: ${(data.confidence * 100).toFixed(0)}%)`, 'decision');
+                this.updateAIBrain({ state: data.decision, confidence: data.confidence });
+                break;
+            case 'ai_state':
+                this.updateAIBrain({
+                    state: data.currentTask || 'idle',
+                    target: data.target || 'None',
+                    objective: data.memory?.[0]?.action || 'Analyzing...'
+                });
+                break;
+            case 'request_guidance':
+                this.addThought(`AI requesting guidance: ${data.situation}`, 'question');
+                this.addChatMessage('ai', `Need guidance: ${data.situation}`);
+                break;
+            case 'chat':
+                this.addThought(`AI says: ${data.message}`, 'chat');
+                this.addChatMessage('ai', data.message);
+                break;
+            case 'ai_response':
+                this.addChatMessage('ai', data.message || data.response);
+                break;
+            case 'ai_answer':
+                this.addChatMessage('external', data.answer);
+                break;
+            case 'instruction':
+                this.addThought(`External command: ${data.command}`, 'command');
+                this.addChatMessage('external', `Command: ${data.command}`);
+                break;
+            case 'user_directive':
+                // Show directives from other sources
+                if (data.source !== 'livecam') {
+                    this.addChatMessage('user', data.directive);
+                }
+                break;
+            default:
+                console.log('[AI Live Cam] Unknown message type:', type, data);
+        }
+    },
+
+    updateAIBrain: function(brain) {
+        if (brain.state) {
+            document.getElementById('ai-state').textContent = brain.state.toUpperCase();
+        }
+        if (brain.target !== undefined) {
+            document.getElementById('ai-target').textContent = brain.target;
+        }
+        if (brain.objective) {
+            document.getElementById('ai-objective').textContent = brain.objective;
+        }
+    },
+
     updateThoughts: function() {
-        // This will be filled by AI player
+        // This is called periodically to update the thoughts display
+        // Thoughts are added via addThought() when messages arrive from Vision Brain
+
+        // If not connected, show status
+        if (!this.wsConnected) {
+            const thoughtsDiv = document.getElementById('ai-thoughts');
+            if (thoughtsDiv && thoughtsDiv.children.length === 0) {
+                this.addThought('Connecting to Vision Brain...', 'system');
+            }
+        }
+    },
+
+    addThought: function(message, type = 'info') {
+        const thoughtsDiv = document.getElementById('ai-thoughts');
+        if (!thoughtsDiv) return;
+
+        const entry = document.createElement('div');
+        entry.className = 'thought-entry';
+
+        const time = new Date().toLocaleTimeString();
+        const timestamp = document.createElement('span');
+        timestamp.className = 'thought-time';
+        timestamp.textContent = `[${time}] `;
+
+        const content = document.createElement('span');
+        content.textContent = message;
+
+        // Color code by type
+        switch(type) {
+            case 'decision':
+                content.style.color = '#0ff';
+                break;
+            case 'question':
+                content.style.color = '#fa0';
+                break;
+            case 'error':
+                content.style.color = '#f44';
+                break;
+            case 'command':
+                content.style.color = '#f0f';
+                break;
+            case 'chat':
+                content.style.color = '#0f0';
+                break;
+            case 'system':
+                content.style.color = '#aaa';
+                break;
+            default:
+                content.style.color = '#0f6';
+        }
+
+        entry.appendChild(timestamp);
+        entry.appendChild(content);
+        thoughtsDiv.insertBefore(entry, thoughtsDiv.firstChild);
+
+        // Keep last 20 thoughts
+        while (thoughtsDiv.children.length > 20) {
+            thoughtsDiv.removeChild(thoughtsDiv.lastChild);
+        }
+
+        // Store in history
+        this.lastThoughts.unshift({ message, type, time });
+        if (this.lastThoughts.length > 50) {
+            this.lastThoughts.pop();
+        }
     },
     
     drawRadar: function(state) {
@@ -784,30 +1350,39 @@ const AILiveCam = {
     
     startAILoop: function() {
         if (this.aiLoopInterval) clearInterval(this.aiLoopInterval);
-        
+
+        let visionFrameCounter = 0;
+
         this.aiLoopInterval = setInterval(() => {
             if (!this.aiPlayerActive || !window.AIPlayerAPI) return;
-            
+
             // Get game state
             const state = window.AIPlayerAPI.getGameState();
             if (!state) return;
-            
+
+            // Send vision frame to Vision Brain every 10 ticks (1 second at 100ms interval)
+            visionFrameCounter++;
+            if (visionFrameCounter >= 10 && this.wsConnected) {
+                this.sendVisionFrame(state);
+                visionFrameCounter = 0;
+            }
+
             // Simple AI behavior: move and look around
             // Check for enemies
             if (state.enemies && state.enemies.length > 0) {
                 // Find closest enemy
-                const closest = state.enemies.reduce((prev, curr) => 
+                const closest = state.enemies.reduce((prev, curr) =>
                     prev.distance < curr.distance ? prev : curr
                 );
-                
+
                 // Calculate look direction to enemy
                 const dx = closest.x - state.player.x;
                 const dz = closest.z - state.player.z;
                 const yaw = Math.atan2(dx, dz);
-                
+
                 // Look at enemy
                 window.AIPlayerAPI.setLook(yaw, 0);
-                
+
                 // Move toward enemy if far
                 if (closest.distance > 15) {
                     window.AIPlayerAPI.setInput('moveForward', true);
@@ -815,10 +1390,10 @@ const AILiveCam = {
                     window.AIPlayerAPI.setInput('moveForward', false);
                     window.AIPlayerAPI.setInput('moveBackward', true);
                 }
-                
+
                 // Shoot if aimed
                 window.AIPlayerAPI.setInput('fire', true);
-                
+
                 this.log(`🎯 Engaging enemy at ${closest.distance.toFixed(1)}m`, 'ai-combat');
             } else {
                 // No enemies - explore
@@ -826,6 +1401,72 @@ const AILiveCam = {
                 window.AIPlayerAPI.setInput('fire', false);
             }
         }, 100);
+    },
+
+    sendVisionFrame: function(state) {
+        if (!this.ws || !this.wsConnected) return;
+
+        try {
+            // Find game canvas using same logic as renderGameView
+            let gameCanvas = null;
+
+            // Method 1: Check cached reference
+            if (window.omni && window.omni.gameCanvas) {
+                gameCanvas = window.omni.gameCanvas;
+            }
+
+            // Method 2: Look for THREE.js renderer canvas
+            if (!gameCanvas && window.renderer && window.renderer.domElement) {
+                gameCanvas = window.renderer.domElement;
+            }
+
+            if (!gameCanvas) return;
+
+            // Scale down for transmission
+            const scaledWidth = 320;
+            const scaledHeight = 240;
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = scaledWidth;
+            tempCanvas.height = scaledHeight;
+
+            const ctx = tempCanvas.getContext('2d');
+            ctx.drawImage(gameCanvas, 0, 0, scaledWidth, scaledHeight);
+
+            const frameData = tempCanvas.toDataURL('image/jpeg', 0.6);
+
+            // Prepare vision data
+            const visionData = {
+                type: 'vision_frame',
+                timestamp: Date.now(),
+                frame: frameData,
+                position: {
+                    x: state.player.x,
+                    y: state.player.y,
+                    z: state.player.z
+                },
+                rotation: {
+                    yaw: state.player.yaw,
+                    pitch: state.player.pitch
+                },
+                detected_objects: state.enemies.map(e => ({
+                    type: 'enemy',
+                    faction: e.faction,
+                    distance: e.distance,
+                    position: { x: e.x, y: e.y, z: e.z },
+                    threat: e.distance < 15 ? 'high' : 'medium'
+                })),
+                threats: state.enemies.filter(e => e.distance < 20),
+                player_state: {
+                    health: state.player.health,
+                    ammo: state.player.ammo,
+                    velocity: state.player.velocity
+                }
+            };
+
+            this.ws.send(JSON.stringify(visionData));
+        } catch (error) {
+            console.error('[AI Live Cam] Failed to send vision frame:', error);
+        }
     },
     
     testConnection: function() {
@@ -873,6 +1514,6 @@ if (document.readyState === 'loading') {
 // Expose to window
 window.AILiveCam = AILiveCam;
 
-console.log('[AI Diagnostics] Live cam loaded - Press F3 or F4 to open unified interface (testing + live cam)');
+console.log('[AI Diagnostics] Live cam loaded - Press F4 to open live cam (watch AI play)');
 
 })();

@@ -24,8 +24,85 @@ const gameState = {
     timeOfDay: 12.0, 
     isInDialogue: false,
     isPipboyOpen: false,
-    isInventoryOpen: false
+    isInventoryOpen: false,
+    menuOpenByEsc: false
 };
+
+// --- KEYBINDINGS SYSTEM ---
+const DEFAULT_KEYBINDS = {
+    moveForward: 'KeyW',
+    moveBackward: 'KeyS',
+    moveLeft: 'KeyA',
+    moveRight: 'KeyD',
+    jump: 'Space',
+    sprint: 'ShiftLeft',
+    crouch: 'ControlLeft',
+    reload: 'KeyR',
+    interact: 'KeyF',
+    fireMode: 'KeyV',
+    pipboy: 'Tab',
+    inventory: 'KeyI',
+    commander: 'KeyM',
+    editor: 'F2',
+    spectator: 'KeyG',
+    pause: 'Escape'
+};
+
+let KEYBINDS = {...DEFAULT_KEYBINDS};
+
+// Keybinding management functions
+function loadKeybinds() {
+    try {
+        const saved = localStorage.getItem('omni_keybinds_v1');
+        if (saved) {
+            const parsed = JSON.parse(saved);
+            KEYBINDS = {...DEFAULT_KEYBINDS, ...parsed};
+            console.log('[Keybinds] Loaded custom keybindings');
+        }
+    } catch(e) {
+        console.error('[Keybinds] Failed to load keybindings:', e);
+        KEYBINDS = {...DEFAULT_KEYBINDS};
+    }
+}
+
+function saveKeybinds() {
+    try {
+        localStorage.setItem('omni_keybinds_v1', JSON.stringify(KEYBINDS));
+        console.log('[Keybinds] Saved keybindings');
+    } catch(e) {
+        console.error('[Keybinds] Failed to save keybindings:', e);
+    }
+}
+
+function resetKeybinds() {
+    KEYBINDS = {...DEFAULT_KEYBINDS};
+    saveKeybinds();
+    console.log('[Keybinds] Reset to defaults');
+}
+
+function setKeybind(action, keyCode) {
+    if (!DEFAULT_KEYBINDS.hasOwnProperty(action)) {
+        console.error('[Keybinds] Invalid action:', action);
+        return false;
+    }
+    KEYBINDS[action] = keyCode;
+    saveKeybinds();
+    return true;
+}
+
+// Helper to check if a key matches an action
+function isKeyPressed(action) {
+    return keys[KEYBINDS[action]] || false;
+}
+
+// Expose to window for settings UI
+window.Keybinds = {
+    get: () => KEYBINDS,
+    set: setKeybind,
+    reset: resetKeybinds,
+    defaults: DEFAULT_KEYBINDS
+};
+
 
 // --- CORE VARIABLES ---
 let scene, camera, renderer, clock;
@@ -79,8 +156,198 @@ const player = {
     fireModeIndex: 0, burstCount: 0, lastFireTime: 0, lastShotEnd: null
 };
 
+// Spectator mode (noclip/fly)
+let spectatorMode = false;
+let spectatorKeyPressed = false; // Track if key was pressed last frame
+const spectatorSettings = {
+    flySpeed: 20,
+    sensitivity: 0.002
+};
+
 const keys = {};
 window.keys = keys; // Expose for editor freeroam camera
+window.spectatorMode = { get: () => spectatorMode, set: (v) => { spectatorMode = v; console.log('[Spectator] Mode:', spectatorMode ? 'ENABLED' : 'DISABLED'); } };
+// Expose game objects for AI testing and AI player
+Object.defineProperty(window, 'cameraRig', { get: () => cameraRig });
+Object.defineProperty(window, 'objects', { get: () => objects });
+Object.defineProperty(window, 'player', { get: () => player });
+Object.defineProperty(window, 'scene', { get: () => scene });
+Object.defineProperty(window, 'aiUnits', { get: () => aiUnits });
+Object.defineProperty(window, 'gameMode', { get: () => gameMode });
+Object.defineProperty(window, 'isGameActive', { get: () => isGameActive });
+
+// === AI PLAYER API ===
+// Allows autonomous AI to read game state and control the player
+window.AIPlayerAPI = {
+    // Get comprehensive game state
+    getGameState() {
+        if (!isGameActive || !cameraRig || !player) {
+            return null;
+        }
+        
+        // Get all enemies (AI units)
+        const enemies = aiUnits.map(unit => ({
+            id: unit.id || Math.random().toString(),
+            x: unit.mesh ? unit.mesh.position.x : 0,
+            y: unit.mesh ? unit.mesh.position.y : 0,
+            z: unit.mesh ? unit.mesh.position.z : 0,
+            health: unit.health !== undefined ? unit.health : 100,
+            faction: unit.faction || 'UNKNOWN',
+            state: unit.state || 'IDLE',
+            distance: unit.mesh && cameraRig ? 
+                Math.sqrt(
+                    Math.pow(unit.mesh.position.x - cameraRig.position.x, 2) +
+                    Math.pow(unit.mesh.position.z - cameraRig.position.z, 2)
+                ) : 999
+        }));
+        
+        return {
+            player: {
+                x: cameraRig.position.x,
+                y: cameraRig.position.y,
+                z: cameraRig.position.z,
+                yaw: player.yaw,
+                pitch: player.pitch,
+                health: player.health,
+                maxHealth: player.maxHealth,
+                ammo: player.ammo,
+                reserveAmmo: player.reserveAmmo,
+                stamina: player.stamina,
+                isSprinting: player.isSprinting,
+                isCrouching: player.isCrouching,
+                isReloading: player.isReloading,
+                isAiming: player.isAiming,
+                onGround: player.onGround,
+                velocity: {
+                    x: player.velocity.x,
+                    y: player.velocity.y,
+                    z: player.velocity.z
+                }
+            },
+            enemies: enemies,
+            objectsCount: objects.length,
+            gameMode: gameMode,
+            timestamp: Date.now()
+        };
+    },
+    
+    // Input injection - allows AI to control the player
+    _aiInputs: {},
+    _aiMouseDelta: { x: 0, y: 0 },
+    _aiLookTarget: null,
+    _aiActive: false,
+    
+    // Set input state (simulates key press/release)
+    setInput(action, pressed) {
+        this._aiInputs[action] = pressed;
+        if (pressed) this._aiActive = true;
+        
+        // Map actions to key codes
+        const keyMap = {
+            'moveForward': KEYBINDS.moveForward,
+            'moveBackward': KEYBINDS.moveBackward,
+            'moveLeft': KEYBINDS.moveLeft,
+            'moveRight': KEYBINDS.moveRight,
+            'jump': KEYBINDS.jump,
+            'sprint': KEYBINDS.sprint,
+            'crouch': KEYBINDS.crouch,
+            'fire': 'MouseLeft',
+            'aim': 'MouseRight',
+            'reload': KEYBINDS.reload
+        };
+        
+        const keyCode = keyMap[action];
+        if (keyCode) {
+            keys[keyCode] = pressed;
+        }
+    },
+    
+    // Press a key once (for actions like reload, interact)
+    pressKey(action) {
+        this.setInput(action, true);
+        setTimeout(() => this.setInput(action, false), 50);
+    },
+    
+    // Set camera look direction (yaw, pitch in radians)
+    setLook(yaw, pitch) {
+        if (player) {
+            player.yaw = yaw;
+            player.pitch = Math.max(-Math.PI / 2.1, Math.min(Math.PI / 2.1, pitch));
+        }
+    },
+    
+    // Add relative mouse movement
+    addMouseMovement(deltaX, deltaY) {
+        this._aiMouseDelta.x += deltaX;
+        this._aiMouseDelta.y += deltaY;
+    },
+    
+    // Clear all AI inputs
+    releaseAllInputs() {
+        for (const action in this._aiInputs) {
+            this.setInput(action, false);
+        }
+        this._aiInputs = {};
+        this._aiMouseDelta = { x: 0, y: 0 };
+    },
+    
+    // Check if AI is currently controlling
+    isAIControlling() {
+        return this._aiActive || Object.values(this._aiInputs).some(v => v === true);
+    },
+    
+    // Activate AI control mode
+    activateAI() {
+        this._aiActive = true;
+        console.log('[AI] AI control activated - pointer lock bypass enabled');
+    },
+    
+    // Deactivate AI control mode
+    deactivateAI() {
+        this._aiActive = false;
+        this.releaseAllInputs();
+        console.log('[AI] AI control deactivated');
+    },
+    
+    // Simulate shooting
+    shoot() {
+        if (player && !player.isReloading && player.ammo > 0) {
+            this.setInput('fire', true);
+            setTimeout(() => this.setInput('fire', false), 100);
+        }
+    }
+};
+
+window.OmniKeybinds = window.OmniKeybinds || {
+    handlers: [],
+    register(handler) {
+        if (!handler || !handler.id) return;
+        this.handlers = this.handlers.filter(h => h.id !== handler.id);
+        this.handlers.push(handler);
+        this.handlers.sort((a, b) => (b.priority || 0) - (a.priority || 0));
+    },
+    unregister(id) {
+        this.handlers = this.handlers.filter(h => h.id !== id);
+    },
+    isEditableTarget(target) {
+        if (!target) return false;
+        if (target.isContentEditable) return true;
+        const tag = (target.tagName || '').toLowerCase();
+        return tag === 'input' || tag === 'textarea' || tag === 'select';
+    },
+    shouldIgnoreEvent(e) {
+        if (!e) return false;
+        if (!this.isEditableTarget(e.target)) return false;
+        return e.code !== 'Escape' && e.code !== 'F2';
+    },
+    dispatch(e) {
+        if (this.shouldIgnoreEvent(e)) return;
+        for (const handler of this.handlers) {
+            if (handler.when && !handler.when(e)) continue;
+            if (handler.onKeyDown && handler.onKeyDown(e)) return;
+        }
+    }
+};
 
 // --- PERSISTENCE ---
 function loadWorldData() {
@@ -93,6 +360,8 @@ function loadWorldData() {
             player.reserveAmmo = parsed.reserveAmmo || 90;
         } catch(e) { console.error("Save load failed", e); }
     }
+    // Load keybindings
+    loadKeybinds();
 }
 function saveWorldData() {
     if (!isGameActive) return;
@@ -149,11 +418,21 @@ function initGame() {
         cameraRig = new THREE.Group();
         try {
             const saved = JSON.parse(localStorage.getItem('omni_ops_save_v7') || '{}');
-            if (saved.pos) cameraRig.position.set(saved.pos.x, saved.pos.y, saved.pos.z);
-            else cameraRig.position.set((myPlayerIndex % 2) * 5, 0, (Math.floor(myPlayerIndex / 2)) * 5);
+            // Clear bad saved positions (too low or at origin)
+            if (saved.pos && saved.pos.y > 2 && (saved.pos.x !== 0 || saved.pos.z !== 0)) {
+                cameraRig.position.set(saved.pos.x, saved.pos.y, saved.pos.z);
+            } else {
+                // Spawn deep in wilderness, far from city
+                const spawnX = 300 + (myPlayerIndex % 2) * 25;
+                const spawnZ = 300 + (Math.floor(myPlayerIndex / 2)) * 25;
+                cameraRig.position.set(spawnX, 3.0, spawnZ);
+                console.log(`[Init] Spawning player ${myPlayerIndex} at deep wilderness: (${spawnX}, 3.0, ${spawnZ})`);
+            }
         } catch(e) {
             console.error('[Init] Failed to load saved position:', e);
-            cameraRig.position.set((myPlayerIndex % 2) * 5, 0, (Math.floor(myPlayerIndex / 2)) * 5);
+            const spawnX = 300 + (myPlayerIndex % 2) * 25;
+            const spawnZ = 300 + (Math.floor(myPlayerIndex / 2)) * 25;
+            cameraRig.position.set(spawnX, 3.0, spawnZ);
         }
         
         console.log('[initGame] Camera rig positioned at:', cameraRig.position);
@@ -173,7 +452,7 @@ function initGame() {
         weaponPivot.position.set(0.35, -0.35, -0.6);
         
         console.log('[initGame] Creating WebGL renderer...');
-        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
         
         // Check for WebGL support and errors
         if (!renderer) {
@@ -268,6 +547,7 @@ function launchGame() {
     try {
         loadWorldData();
         if(isMultiplayer && currentRoomId) saveSession(currentRoomId);
+        gameState.menuOpenByEsc = false;
         
         console.log('[launchGame] Hiding menu-overlay, showing game UI');
         const menuOverlay = document.getElementById('menu-overlay');
@@ -375,6 +655,8 @@ function showScreen(screen) {
 window.launchGame = launchGame;
 window.initGame = initGame;
 window.handleInteraction = handleInteraction;
+window.toggleCommanderMode = toggleCommanderMode;
+window.safeRequestPointerLock = safeRequestPointerLock;
 
 window.startMode = function(mode) {
     console.log(`[startMode] Called with mode: ${mode}`);
@@ -595,6 +877,7 @@ async function quitToMenu() {
     const menuOverlay = document.getElementById('menu-overlay');
     if (uiLayer) uiLayer.style.display = 'none';
     if (menuOverlay) menuOverlay.style.display = 'flex';
+    gameState.menuOpenByEsc = false;
     showScreen('main');
     document.exitPointerLock();
     
@@ -608,6 +891,250 @@ async function quitToMenu() {
     const tagsContainer = document.getElementById('nametags-container');
     if(tagsContainer) tagsContainer.innerHTML = ''; 
     renderLobby();
+}
+
+// --- SETTINGS UI FUNCTIONS ---
+function initializeSettingsUI() {
+    console.log('[Settings] Initializing settings UI...');
+    
+    // Settings screen navigation
+    const btnMainSettings = document.getElementById('btn-main-settings');
+    if (btnMainSettings) {
+        btnMainSettings.onclick = () => {
+            showScreen('settings');
+            populateKeybindList();
+        };
+    }
+    
+    const btnSettingsBack = document.getElementById('btn-settings-back');
+    if (btnSettingsBack) {
+        btnSettingsBack.onclick = () => {
+            showScreen('main');
+        };
+    }
+    
+    // Settings tabs
+    const settingsTabs = document.querySelectorAll('.settings-tab');
+    settingsTabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            const tabName = tab.getAttribute('data-tab');
+            switchSettingsTab(tabName);
+        });
+    });
+    
+    // Reset controls button
+    const btnResetControls = document.getElementById('btn-reset-controls');
+    if (btnResetControls) {
+        btnResetControls.onclick = () => {
+            if (confirm('Reset all controls to default?')) {
+                window.Keybinds.reset();
+                populateKeybindList();
+                alert('Controls reset to defaults!');
+            }
+        };
+    }
+    
+    // Graphics settings
+    const mouseSens = document.getElementById('mouse-sensitivity');
+    if (mouseSens) {
+        mouseSens.oninput = (e) => {
+            SETTINGS.MOUSE_SENSE = parseFloat(e.target.value);
+            document.getElementById('mouse-sens-value').textContent = e.target.value;
+        };
+    }
+    
+    const fovSlider = document.getElementById('fov-slider');
+    if (fovSlider) {
+        fovSlider.oninput = (e) => {
+            SETTINGS.FOV_BASE = parseInt(e.target.value);
+            document.getElementById('fov-value').textContent = e.target.value + '°';
+            if (camera) camera.updateProjectionMatrix();
+        };
+    }
+    
+    const hifiToggle = document.getElementById('hifi-toggle');
+    if (hifiToggle) {
+        hifiToggle.onchange = (e) => {
+            SETTINGS.HIFI = e.target.checked;
+            if (renderer) {
+                renderer.shadowMap.enabled = SETTINGS.HIFI;
+            }
+        };
+    }
+    
+    // Audio settings
+    const volumeSlider = document.getElementById('master-volume');
+    if (volumeSlider) {
+        volumeSlider.oninput = (e) => {
+            SETTINGS.MASTER_VOL = parseFloat(e.target.value);
+            document.getElementById('volume-value').textContent = Math.round(e.target.value * 100) + '%';
+            if (masterGain) {
+                masterGain.gain.setValueAtTime(SETTINGS.MASTER_VOL, audioCtx.currentTime);
+            }
+        };
+    }
+    
+    // Gameplay settings
+    const speedSlider = document.getElementById('move-speed');
+    if (speedSlider) {
+        speedSlider.oninput = (e) => {
+            SETTINGS.MAX_WALK = parseInt(e.target.value);
+            document.getElementById('speed-value').textContent = e.target.value;
+        };
+    }
+    
+    const sprintSlider = document.getElementById('sprint-speed');
+    if (sprintSlider) {
+        sprintSlider.oninput = (e) => {
+            SETTINGS.MAX_SPRINT = parseInt(e.target.value);
+            document.getElementById('sprint-value').textContent = e.target.value;
+        };
+    }
+    
+    console.log('[Settings] Settings UI initialized');
+}
+
+function switchSettingsTab(tabName) {
+    // Hide all tab contents
+    document.querySelectorAll('.settings-tab-content').forEach(content => {
+        content.style.display = 'none';
+    });
+    
+    // Remove active class from all tabs
+    document.querySelectorAll('.settings-tab').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    
+    // Show selected tab
+    const selectedTab = document.getElementById('tab-' + tabName);
+    if (selectedTab) {
+        selectedTab.style.display = 'block';
+    }
+    
+    // Add active class to clicked tab
+    const activeTab = document.querySelector(`.settings-tab[data-tab="${tabName}"]`);
+    if (activeTab) {
+        activeTab.classList.add('active');
+    }
+}
+
+function populateKeybindList() {
+    const keybindList = document.getElementById('keybind-list');
+    if (!keybindList) return;
+    
+    const keybinds = window.Keybinds.get();
+    const actionNames = {
+        moveForward: 'Move Forward',
+        moveBackward: 'Move Backward',
+        moveLeft: 'Move Left',
+        moveRight: 'Move Right',
+        jump: 'Jump',
+        sprint: 'Sprint',
+        crouch: 'Crouch',
+        reload: 'Reload',
+        interact: 'Interact',
+        fireMode: 'Fire Mode',
+        pipboy: 'Pip-Boy',
+        inventory: 'Inventory',
+        commander: 'Commander Mode',
+        editor: 'Editor',
+        pause: 'Pause Menu'
+    };
+    
+    keybindList.innerHTML = '';
+    
+    for (const [action, keyCode] of Object.entries(keybinds)) {
+        const item = document.createElement('div');
+        item.className = 'keybind-item';
+        
+        const label = document.createElement('div');
+        label.className = 'keybind-label';
+        label.textContent = actionNames[action] || action;
+        
+        const button = document.createElement('button');
+        button.className = 'keybind-button';
+        button.textContent = formatKeyCode(keyCode);
+        button.dataset.action = action;
+        button.onclick = () => startKeyRemap(action, button);
+        
+        item.appendChild(label);
+        item.appendChild(button);
+        keybindList.appendChild(item);
+    }
+}
+
+function formatKeyCode(keyCode) {
+    // Convert key codes to readable names
+    const keyNames = {
+        'Space': 'Space',
+        'ShiftLeft': 'Left Shift',
+        'ShiftRight': 'Right Shift',
+        'ControlLeft': 'Left Ctrl',
+        'ControlRight': 'Right Ctrl',
+        'F2': 'F2',
+        'Tab': 'Tab',
+        'Escape': 'Esc'
+    };
+    
+    if (keyNames[keyCode]) return keyNames[keyCode];
+    if (keyCode.startsWith('Key')) return keyCode.replace('Key', '');
+    if (keyCode.startsWith('Digit')) return keyCode.replace('Digit', '');
+    return keyCode;
+}
+
+let remappingAction = null;
+let remappingButton = null;
+let remappingListener = null;
+
+function startKeyRemap(action, button) {
+    // Clear any existing listener
+    if (remappingListener) {
+        document.removeEventListener('keydown', remappingListener);
+    }
+    
+    remappingAction = action;
+    remappingButton = button;
+    button.classList.add('listening');
+    button.textContent = 'Press any key...';
+    
+    remappingListener = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        // Don't allow these keys to be remapped to avoid breaking the game
+        const blockedKeys = ['F5', 'F11', 'F12'];
+        if (blockedKeys.includes(e.code)) {
+            alert('This key cannot be remapped!');
+            cancelKeyRemap();
+            return;
+        }
+        
+        // Set the new keybind
+        window.Keybinds.set(remappingAction, e.code);
+        button.classList.remove('listening');
+        button.textContent = formatKeyCode(e.code);
+        
+        // Cleanup
+        document.removeEventListener('keydown', remappingListener);
+        remappingListener = null;
+        remappingAction = null;
+        remappingButton = null;
+    };
+    
+    document.addEventListener('keydown', remappingListener);
+}
+
+function cancelKeyRemap() {
+    if (remappingListener) {
+        document.removeEventListener('keydown', remappingListener);
+    }
+    if (remappingButton) {
+        remappingButton.classList.remove('listening');
+        remappingButton.textContent = formatKeyCode(window.Keybinds.get()[remappingAction]);
+    }
+    remappingListener = null;
+    remappingAction = null;
+    remappingButton = null;
 }
 
 // --- INITIALIZATION ---
@@ -686,6 +1213,7 @@ window.initializeUI = function() {
                 gameState.isInDialogue = false;
                 gameState.isPipboyOpen = false;
                 gameState.isInventoryOpen = false;
+                gameState.menuOpenByEsc = false;
             }
             const menuOverlay = document.getElementById('menu-overlay');
             if (menuOverlay) menuOverlay.style.display = 'none';
@@ -703,6 +1231,7 @@ window.initializeUI = function() {
                 gameState.isInDialogue = false;
                 gameState.isPipboyOpen = false;
                 gameState.isInventoryOpen = false;
+                gameState.menuOpenByEsc = false;
             }
             const menuOverlay = document.getElementById('menu-overlay');
             if (menuOverlay) menuOverlay.style.display = 'none';
@@ -717,6 +1246,9 @@ window.initializeUI = function() {
 
     const fovSlider = document.getElementById('set-fov');
     if(fovSlider) fovSlider.oninput = (e) => { SETTINGS.FOV_BASE = parseInt(e.target.value); if(camera) camera.updateProjectionMatrix(); };
+    
+    // === SETTINGS UI INITIALIZATION ===
+    initializeSettingsUI();
     
     showScreen('main'); // Show main menu
     console.log('[Core Game] UI initialized - showScreen(main) called');
@@ -2332,43 +2864,125 @@ function createImpactEffect(point, normal) {
 }
 
 function updatePhysics(delta) {
+    // === ALWAYS CHECK SPECTATOR TOGGLE FIRST ===
+    const specKey = KEYBINDS.spectator; // Should be 'KeyG'
+    const specKeyDown = keys[specKey];
+    
+    // Debug: Log every frame for spectator toggle
+    if (window.frameCount % 30 === 0) {
+        console.log('[Spectator Debug] Key:', specKey, 'Down:', specKeyDown, 'Previous:', spectatorKeyPressed, 'Current mode:', spectatorMode);
+    }
+    
+    // Toggle on key press (transition from up to down)
+    if (specKeyDown && !spectatorKeyPressed) {
+        spectatorMode = !spectatorMode;
+        console.log('🎮 [SPECTATOR TOGGLE] NOW:', spectatorMode ? 'ENABLED ✓' : 'DISABLED ✗');
+    }
+    spectatorKeyPressed = specKeyDown;
+    
     if (gameState.isInDialogue || gameState.isPipboyOpen || gameState.isInventoryOpen) return; 
 
     if (gameMode === 'COMMANDER') {
         updateMinimap();
         const speed = SETTINGS.COMMANDER_SPEED * delta;
-        if (keys['KeyW']) commanderCamera.position.z -= speed;
-        if (keys['KeyS']) commanderCamera.position.z += speed;
-        if (keys['KeyA']) commanderCamera.position.x -= speed;
-        if (keys['KeyD']) commanderCamera.position.x += speed;
+        if (isKeyPressed('moveForward')) commanderCamera.position.z -= speed;
+        if (isKeyPressed('moveBackward')) commanderCamera.position.z += speed;
+        if (isKeyPressed('moveLeft')) commanderCamera.position.x -= speed;
+        if (isKeyPressed('moveRight')) commanderCamera.position.x += speed;
         return;
     }
 
-    // Require pointer lock for first-person movement
-    if (!document.pointerLockElement) {
-        // Pointer lock lost - show hint on first frame without it
-        if (!window.pointerLockLostOnce) {
-            window.pointerLockLostOnce = true;
-            console.log('[Movement] Pointer lock lost - Click game window to regain control');
+    // === SPECTATOR/NOCLIP MODE (after toggle check) ===
+    if (spectatorMode) {
+        // Free flying in all directions - doesn't need pointer lock
+        const moveDir = new THREE.Vector3();
+        if (isKeyPressed('moveForward')) moveDir.z -= 1;
+        if (isKeyPressed('moveBackward')) moveDir.z += 1;
+        if (isKeyPressed('moveLeft')) moveDir.x -= 1;
+        if (isKeyPressed('moveRight')) moveDir.x += 1;
+        
+        // Vertical movement with Space/Ctrl
+        if (isKeyPressed('jump')) moveDir.y += 1;
+        if (isKeyPressed('crouch')) moveDir.y -= 1;
+        
+        moveDir.normalize();
+        
+        // Compute proper camera axes from yaw and pitch
+        const cosYaw = Math.cos(player.yaw);
+        const sinYaw = Math.sin(player.yaw);
+        const cosPitch = Math.cos(player.pitch);
+        const sinPitch = Math.sin(player.pitch);
+        
+        // Forward: where you're looking (affected by both yaw and pitch)
+        const forward = new THREE.Vector3(
+            sinYaw * cosPitch,      // X
+            -sinPitch,               // Y
+            -cosYaw * cosPitch       // Z
+        );
+        
+        // Right: perpendicular to forward in horizontal plane (yaw only)
+        const right = new THREE.Vector3(
+            cosYaw,   // X
+            0,        // Y
+            sinYaw    // Z
+        );
+        
+        // Up: always vertical
+        const up = new THREE.Vector3(0, 1, 0);
+        
+        let velocity = new THREE.Vector3();
+        velocity.addScaledVector(forward, moveDir.z);
+        velocity.addScaledVector(right, moveDir.x);
+        velocity.addScaledVector(up, moveDir.y);
+        
+        const flySpeed = isKeyPressed('sprint') ? spectatorSettings.flySpeed * 2 : spectatorSettings.flySpeed;
+        velocity.multiplyScalar(flySpeed * delta);
+        
+        cameraRig.position.add(velocity);
+        
+        // Show indicator
+        const hudTopSpec = document.getElementById('hud-top');
+        if (hudTopSpec) {
+            hudTopSpec.innerHTML = '<span style="color: #0ff; font-weight: bold;">🛸 [SPECTATOR MODE] Press G to exit</span>';
         }
-        return;
-    } else {
-        window.pointerLockLostOnce = false;
+        
+        player.onGround = false;
+        return; // Skip all other physics
     }
+
+    // Check if AI is controlling
+    const aiControlling = window.AIPlayerAPI && window.AIPlayerAPI.isAIControlling();
     
+    // Allow movement without pointer lock - AI can control without pointer lock
+    // Pointer lock only required for mouse look
+    if (!aiControlling && !document.pointerLockElement && !spectatorMode) {
+        // Optional: Show indicator that pointer lock not active (but don't force it)
+        const hudTopLock = document.getElementById('hud-top');
+        if (hudTopLock && window.frameCount % 60 === 0) {
+            console.log('[Movement] No pointer lock - mouse look disabled. Press I for pointer lock');
+        }
+    }
+
+    // === NORMAL PHYSICS MODE ===
     // STAMINA SYSTEM
     const moveDir = new THREE.Vector3();
-    if (keys['KeyW']) moveDir.z -= 1; if (keys['KeyS']) moveDir.z += 1;
-    if (keys['KeyA']) moveDir.x -= 1; if (keys['KeyD']) moveDir.x += 1;
+    if (isKeyPressed('moveForward')) moveDir.z -= 1; 
+    if (isKeyPressed('moveBackward')) moveDir.z += 1;
+    if (isKeyPressed('moveLeft')) moveDir.x -= 1; 
+    if (isKeyPressed('moveRight')) moveDir.x += 1;
     moveDir.normalize();
 
     const isMoving = moveDir.length() > 0;
     
-    // Debug: Log input state every 60 frames
+    // Debug: Log input state and camera direction every 60 frames
     if (window.frameCount % 60 === 0 && isStartFrame) {
+        const cameraDir = new THREE.Vector3(0, 0, -1).applyAxisAngle(new THREE.Vector3(1, 0, 0), player.pitch);
+        cameraDir.applyAxisAngle(new THREE.Vector3(0, 1, 0), player.yaw);
         console.log('[Movement Debug]', {
             keysPressed: { W: keys['KeyW'], A: keys['KeyA'], S: keys['KeyS'], D: keys['KeyD'] },
             moveDir: { x: moveDir.x.toFixed(2), z: moveDir.z.toFixed(2) },
+            cameraYaw: (player.yaw * 180 / Math.PI).toFixed(0) + '°',
+            cameraPitch: (player.pitch * 180 / Math.PI).toFixed(0) + '°',
             isMoving: isMoving,
             velocity: { x: player.velocity.x.toFixed(2), z: player.velocity.z.toFixed(2), y: player.velocity.y.toFixed(2) },
             cameraPos: { x: cameraRig.position.x.toFixed(1), y: cameraRig.position.y.toFixed(1), z: cameraRig.position.z.toFixed(1) },
@@ -2376,7 +2990,7 @@ function updatePhysics(delta) {
         });
     }
     window.isStartFrame = true;
-    const wantsSprint = (keys['ShiftLeft'] || keys['ShiftRight']) && isMoving && !player.isCrouching && !player.isAiming;
+    const wantsSprint = isKeyPressed('sprint') && isMoving && !player.isCrouching && !player.isAiming;
     
     if (wantsSprint && player.stamina > 20 && !player.isExhausted) {
         player.isSprinting = true;
@@ -2398,7 +3012,7 @@ function updatePhysics(delta) {
         hpBar.style.width = player.health + '%';
     }
 
-    player.isCrouching = !!(keys['ControlLeft'] || keys['ControlRight'] || keys['Control']);
+    player.isCrouching = isKeyPressed('crouch');
     let speedTarget = player.isSprinting ? SETTINGS.MAX_SPRINT : (player.isCrouching || player.isAiming ? SETTINGS.MAX_CROUCH : SETTINGS.MAX_WALK);
     
     const wishDir = moveDir.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), player.yaw);
@@ -2411,30 +3025,36 @@ function updatePhysics(delta) {
     player.velocity.y -= SETTINGS.GRAVITY * delta;
     const nextPos = cameraRig.position.clone().addScaledVector(player.velocity, delta);
     
-    // Collision
-    for (let obj of objects) {
-        if(!obj) continue;
-        const box = new THREE.Box3().setFromObject(obj);
-        const playerBox = new THREE.Box3().setFromCenterAndSize(new THREE.Vector3(nextPos.x, box.getCenter(new THREE.Vector3()).y, nextPos.z), new THREE.Vector3(SETTINGS.PLAYER_RADIUS * 2, 2, SETTINGS.PLAYER_RADIUS * 2));
-        if (box.intersectsBox(playerBox)) {
-            const currentBoxX = new THREE.Box3().setFromCenterAndSize(new THREE.Vector3(nextPos.x, box.getCenter(new THREE.Vector3()).y, cameraRig.position.z), new THREE.Vector3(SETTINGS.PLAYER_RADIUS * 2, 2, SETTINGS.PLAYER_RADIUS * 2));
-            if (box.intersectsBox(currentBoxX)) { player.velocity.x = 0; nextPos.x = cameraRig.position.x; }
-            const currentBoxZ = new THREE.Box3().setFromCenterAndSize(new THREE.Vector3(cameraRig.position.x, box.getCenter(new THREE.Vector3()).y, nextPos.z), new THREE.Vector3(SETTINGS.PLAYER_RADIUS * 2, 2, SETTINGS.PLAYER_RADIUS * 2));
-            if (box.intersectsBox(currentBoxZ)) { player.velocity.z = 0; nextPos.z = cameraRig.position.z; }
+    // Ground collision check (raycast down from player)
+    const rayOrigin = new THREE.Vector3(cameraRig.position.x, cameraRig.position.y, cameraRig.position.z);
+    const rayDir = new THREE.Vector3(0, -1, 0);
+    const raycaster_ground = new THREE.Raycaster(rayOrigin, rayDir, 0, 10);
+    const groundHits = raycaster_ground.intersectObject(groundPlane);
+    
+    if (groundHits.length > 0) {
+        const groundY = groundHits[0].point.y + player.currentHeight;
+        if (nextPos.y <= groundY + 0.1) {
+            nextPos.y = groundY;
+            player.velocity.y = Math.max(0, player.velocity.y);
+            player.onGround = true;
+        } else {
+            player.onGround = false;
         }
     }
+    
+    // COLLISION DISABLED FOR TESTING - enabling causes phasing
+    // TODO: Fix collision detection box calculations
+    
     cameraRig.position.copy(nextPos);
     
     const targetY = player.isCrouching ? player.crouchHeight : player.eyeLevel;
     player.currentHeight = THREE.MathUtils.lerp(player.currentHeight, targetY, delta * 10);
-    if (cameraRig.position.y <= player.currentHeight) {
-        cameraRig.position.y = player.currentHeight; player.velocity.y = Math.max(0, player.velocity.y); player.onGround = true;
-        if (keys['Space'] && !player.isExhausted) { 
-            const horizontalSpeed = new THREE.Vector2(player.velocity.x, player.velocity.z).length();
-            let jumpBonus = (horizontalSpeed > 2) ? (horizontalSpeed / SETTINGS.MAX_SPRINT) * 12 : 0;
-            player.velocity.y = SETTINGS.JUMP_POWER + jumpBonus; player.onGround = false; 
-        }
-    } else { player.onGround = false; }
+    // Jump input handled in ground check above
+    if (player.onGround && isKeyPressed('jump') && !player.isExhausted) { 
+        const horizontalSpeed = new THREE.Vector2(player.velocity.x, player.velocity.z).length();
+        let jumpBonus = (horizontalSpeed > 2) ? (horizontalSpeed / SETTINGS.MAX_SPRINT) * 12 : 0;
+        player.velocity.y = SETTINGS.JUMP_POWER + jumpBonus; player.onGround = false; 
+    }
     player.leanFactor = THREE.MathUtils.lerp(player.leanFactor, keys['KeyQ'] ? -1 : (keys['KeyE'] ? 1 : 0), delta * 10);
 }
 
@@ -2557,21 +3177,18 @@ function animate() {
 document.addEventListener('pointerlockchange', () => {
     if (switchingModes || gameState.isInDialogue || gameState.isPipboyOpen) return; 
     const menuOverlay = document.getElementById('menu-overlay');
-    if (document.pointerLockElement) { if (menuOverlay) menuOverlay.style.display = 'none'; }
-    else { 
-        if (gameMode === 'FPS') { 
-            if (menuOverlay) menuOverlay.style.display = 'flex'; 
-            showScreen(isGameActive ? 'settings' : 'main'); 
-        }
+    if (document.pointerLockElement) {
+        if (menuOverlay && !gameState.menuOpenByEsc) menuOverlay.style.display = 'none';
+        return;
+    }
+    if (gameMode === 'FPS' && gameState.menuOpenByEsc) {
+        if (menuOverlay) menuOverlay.style.display = 'flex';
+        showScreen(isGameActive ? 'settings' : 'main');
     }
 });
 
-// Click to regain pointer lock when lost during gameplay
-document.addEventListener('click', () => {
-    if (isGameActive && !gameState.isInventoryOpen && !gameState.isPipboyOpen && !gameState.isInDialogue && gameMode === 'FPS' && !document.pointerLockElement) {
-        safeRequestPointerLock();
-    }
-});
+// Pointer lock only on inventory/I key press - NOT on click
+// Removed automatic click-to-lock behavior per user request
 
 // Handle pointer lock errors gracefully
 window.addEventListener('unhandledrejection', (event) => {
@@ -2646,104 +3263,122 @@ document.addEventListener('mouseup', e => {
     }
 });
 
-document.addEventListener('keydown', e => { 
-    keys[e.code] = true; 
+window.OmniKeybinds.register({
+    id: 'core-game',
+    priority: 100,
+    onKeyDown: (e) => {
+        keys[e.code] = true;
 
-    // Toggle Editor (F2)
-    if (e.code === 'F2') {
-        e.preventDefault();
-        if (window.UE5Editor) {
-            if (window.UE5Editor.active) {
-                window.UE5Editor.close();
-            } else {
-                window.UE5Editor.open();
-            }
-        }
-        return;
-    }
-    
-    // Toggle Inventory (I key) - Separate from Pip-Boy
-    if (e.code === 'KeyI' && isGameActive && !gameState.isInDialogue) {
-        // If Pip-Boy is open, switch to inventory tab
-        if (gameState.isPipboyOpen && window.PB) {
-            window.PB.tab = 'inv';
-            window.PB.switchTab(null, 'inv');
-            console.log('[Game] Pip-Boy switched to Inventory tab');
-        } else if (!gameState.isPipboyOpen) {
-            // If Pip-Boy is closed, open it at inventory tab
-            togglePipboy();
-            setTimeout(() => {
-                if (window.PB) {
-                    window.PB.tab = 'inv';
-                    window.PB.switchTab(null, 'inv');
-                    console.log('[Game] Pip-Boy opened at Inventory tab');
+        if (e.code === KEYBINDS.editor) {
+            e.preventDefault();
+            if (window.UE5Editor) {
+                if (window.UE5Editor.active) {
+                    window.UE5Editor.close();
+                } else {
+                    window.UE5Editor.open();
                 }
-            }, 100);
-        }
-        return;
-    }
-    
-    // Toggle Tactical View (M key)
-    if (e.code === 'KeyM' && isGameActive && !gameState.isInDialogue && !gameState.isPipboyOpen) {
-        toggleCommanderMode();
-        return;
-    }
-    
-    // Tab opens Pip-Boy (handled by Pip-Boy system)
-    // I key is intentionally NOT implemented here - use Pip-Boy instead
-    // Pip-Boy includes Map, Quests, and Inventory tabs
-    
-    if (gameState.isInDialogue) {
-        if (e.code === 'Escape') closeDialogue();
-        return; 
-    }
-    
-    if (gameState.isPipboyOpen) {
-        if (e.code === 'Escape') togglePipboy();
-        return;
-    }
-
-    // ESC opens settings menu during gameplay
-    if (e.code === 'Escape' && isGameActive && !gameState.isInDialogue && !gameState.isPipboyOpen && !window.UE5?.active) {
-        e.preventDefault();
-        const settingsScreen = document.getElementById('settings-screen');
-        const menuOverlay = document.getElementById('menu-overlay');
-        if (settingsScreen && menuOverlay) {
-            const isSettingsOpen = settingsScreen.style.display !== 'none';
-            if (isSettingsOpen) {
-                // Close settings and resume
-                // Clear all blocking flags
-                if (gameState) {
-                    gameState.isInDialogue = false;
-                    gameState.isPipboyOpen = false;
-                    gameState.isInventoryOpen = false;
-                }
-                settingsScreen.style.display = 'none';
-                menuOverlay.style.display = 'none';
-                safeRequestPointerLock();
-            } else {
-                // Open settings
-                settingsScreen.style.display = 'flex';
-                menuOverlay.style.display = 'flex';
-                document.exitPointerLock();
             }
+            return true;
         }
-        return;
-    }
+        
+        if (e.code === KEYBINDS.inventory && isGameActive && !gameState.isInDialogue) {
+            if (gameState.isPipboyOpen && window.PB) {
+                window.PB.tab = 'inv';
+                window.PB.switchTab(null, 'inv');
+                console.log('[Game] Pip-Boy switched to Inventory tab');
+            } else if (!gameState.isPipboyOpen) {
+                togglePipboy();
+                setTimeout(() => {
+                    if (window.PB) {
+                        window.PB.tab = 'inv';
+                        window.PB.switchTab(null, 'inv');
+                        console.log('[Game] Pip-Boy opened at Inventory tab');
+                    }
+                }, 100);
+            }
+            return true;
+        }
+        
+        if (e.code === KEYBINDS.commander && isGameActive && !gameState.isInDialogue && !gameState.isPipboyOpen) {
+            toggleCommanderMode();
+            return true;
+        }
+        
+        if (gameState.isInDialogue) {
+            if (e.code === KEYBINDS.pause) closeDialogue();
+            return true; 
+        }
+        
+        if (gameState.isPipboyOpen) {
+            if (e.code === KEYBINDS.pause) {
+                togglePipboy();
+                return true;
+            }
+            return false;
+        }
 
-    if (gameMode === 'FPS') {
-        if(e.code === 'KeyR' && isGameActive) startReload();
-        if(e.code === 'KeyF' && isGameActive) { e.preventDefault(); handleInteraction(); }  // F for INTERACT
-        if(e.code === 'KeyV' && isGameActive) {
-            player.fireModeIndex = (player.fireModeIndex + 1) % SETTINGS.FIRE_MODES.length;
-            const modeText = document.getElementById('mode-text');
-            if (modeText) modeText.innerText = SETTINGS.FIRE_MODES[player.fireModeIndex];
+        if (e.code === KEYBINDS.pause && isGameActive && !gameState.isInDialogue && !gameState.isPipboyOpen && !window.UE5?.active) {
+            e.preventDefault();
+            const settingsScreen = document.getElementById('settings-screen');
+            const menuOverlay = document.getElementById('menu-overlay');
+            if (settingsScreen && menuOverlay) {
+                const isSettingsOpen = settingsScreen.style.display !== 'none';
+                if (isSettingsOpen) {
+                    if (gameState) {
+                        gameState.isInDialogue = false;
+                        gameState.isPipboyOpen = false;
+                        gameState.isInventoryOpen = false;
+                        gameState.menuOpenByEsc = false;
+                    }
+                    settingsScreen.style.display = 'none';
+                    menuOverlay.style.display = 'none';
+                    safeRequestPointerLock();
+                } else {
+                    settingsScreen.style.display = 'flex';
+                    menuOverlay.style.display = 'flex';
+                    gameState.menuOpenByEsc = true;
+                    document.exitPointerLock();
+                }
+            }
+            return true;
         }
-    } else if (gameMode === 'COMMANDER') {
-        if (e.code === 'Digit1') issueTacticalOrder(STATES.CHARGE);
-        if (e.code === 'Digit2') issueTacticalOrder(STATES.HOLD);
-        if (e.code === 'Digit3') issueTacticalOrder(STATES.FOLLOW);
+
+        if (gameMode === 'FPS') {
+            if(e.code === KEYBINDS.reload && isGameActive) { startReload(); return true; }
+            if(e.code === KEYBINDS.interact && isGameActive) { e.preventDefault(); handleInteraction(); return true; }
+            if(e.code === KEYBINDS.fireMode && isGameActive) {
+                player.fireModeIndex = (player.fireModeIndex + 1) % SETTINGS.FIRE_MODES.length;
+                const modeText = document.getElementById('mode-text');
+                if (modeText) modeText.innerText = SETTINGS.FIRE_MODES[player.fireModeIndex];
+                return true;
+            }
+        } else if (gameMode === 'COMMANDER') {
+            if (e.code === 'Digit1') { issueTacticalOrder(STATES.CHARGE); return true; }
+            if (e.code === 'Digit2') { issueTacticalOrder(STATES.HOLD); return true; }
+            if (e.code === 'Digit3') { issueTacticalOrder(STATES.FOLLOW); return true; }
+        }
+
+        return false;
     }
+});
+
+document.addEventListener('keydown', (e) => {
+    // Set key state first for movement
+    keys[e.code] = true;
+    
+    // Request pointer lock ONLY when I key is pressed (inventory)
+    if (e.code === 'KeyI' && isGameActive && gameMode === 'FPS' && !document.pointerLockElement) {
+        console.log('[PointerLock] I key pressed - requesting pointer lock');
+        safeRequestPointerLock();
+    }
+    
+    // Debug G key toggle
+    if (e.code === 'KeyG') {
+        console.log('[Debug] G key pressed! Spectator mode currently:', spectatorMode, 'Key pressed state:', keys['KeyG']);
+    }
+    
+    // Then dispatch for special handlers
+    window.OmniKeybinds.dispatch(e);
 });
 document.addEventListener('keyup', e => { keys[e.code] = false; });
 

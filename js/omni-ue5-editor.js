@@ -560,54 +560,60 @@
 
         // ========== KEYBOARD SETUP ==========
         setupKeyboard() {
-            document.addEventListener('keydown', (e) => {
-                if (!this.active) return;
+            const handler = (e) => {
+                if (!this.active) return false;
 
-                // F2 to close
                 if (e.key === 'F2') {
                     e.preventDefault();
                     this.close();
-                    return;
+                    return true;
                 }
 
-                // Transform modes
-                if (e.key === 'g') { e.preventDefault(); this.setTransformMode('MOVE'); }
-                if (e.key === 'r') { e.preventDefault(); this.setTransformMode('ROTATE'); }
-                if (e.key === 's') { e.preventDefault(); this.setTransformMode('SCALE'); }
+                if (e.key === 'g') { e.preventDefault(); this.setTransformMode('MOVE'); return true; }
+                if (e.key === 'r') { e.preventDefault(); this.setTransformMode('ROTATE'); return true; }
+                if (e.key === 's') { e.preventDefault(); this.setTransformMode('SCALE'); return true; }
 
-                // Rotation axes
-                if (e.key === 'x') this.settings.rotateAxis = 'X';
-                if (e.key === 'y') this.settings.rotateAxis = 'Y';
-                if (e.key === 'z') this.settings.rotateAxis = 'Z';
+                if (e.key === 'x') { this.settings.rotateAxis = 'X'; return true; }
+                if (e.key === 'y') { this.settings.rotateAxis = 'Y'; return true; }
+                if (e.key === 'z') { this.settings.rotateAxis = 'Z'; return true; }
 
-                // Delete
                 if (e.key === 'Delete' || e.key === 'Backspace') {
                     e.preventDefault();
                     this.deleteSelected();
+                    return true;
                 }
 
-                // Duplicate
                 if (e.ctrlKey && e.key === 'd') {
                     e.preventDefault();
                     this.duplicateSelected();
+                    return true;
                 }
 
-                // Undo/Redo
                 if (e.ctrlKey && e.key === 'z') {
                     e.preventDefault();
                     this.undo();
+                    return true;
                 }
                 if (e.ctrlKey && (e.key === 'y' || (e.shiftKey && e.key === 'z'))) {
                     e.preventDefault();
                     this.redo();
+                    return true;
                 }
 
-                // Save
                 if (e.ctrlKey && e.key === 's') {
                     e.preventDefault();
                     this.save();
+                    return true;
                 }
-            });
+
+                return false;
+            };
+
+            if (window.OmniKeybinds && window.OmniKeybinds.register) {
+                window.OmniKeybinds.register({ id: 'ue5-editor', priority: 80, onKeyDown: handler });
+            } else {
+                document.addEventListener('keydown', handler);
+            }
         },
 
         // ========== MOUSE SETUP ==========

@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🤝 AI Collaboration Chat - Three-Way Communication</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: linear-gradient(135deg, #0a0a1a 0%, #1a0a1a 100%);
+            color: #fff;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #f0f 0%, #a0a 100%);
+            padding: 15px 20px;
+            border-bottom: 3px solid #f0f;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 4px 20px rgba(255, 0, 255, 0.5);
+        }
+
+        .header h1 {
+            font-size: 20px;
+            color: #000;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 8px 15px;
+            border-radius: 20px;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #f00;
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.connected {
+            background: #0f0;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .participants {
+            background: rgba(0, 0, 0, 0.5);
+            padding: 12px 20px;
+            border-bottom: 2px solid rgba(255, 0, 255, 0.3);
+            display: flex;
+            gap: 20px;
+            font-size: 12px;
+        }
+
+        .participant {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            border-radius: 15px;
+            border: 2px solid;
+        }
+
+        .participant.user {
+            border-color: #0af;
+            background: rgba(0, 170, 255, 0.1);
+            color: #0af;
+        }
+
+        .participant.in-game {
+            border-color: #0f6;
+            background: rgba(0, 255, 102, 0.1);
+            color: #0f6;
+        }
+
+        .participant.external {
+            border-color: #f90;
+            background: rgba(255, 153, 0, 0.1);
+            color: #f90;
+        }
+
+        .chat-container {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .message {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            padding: 12px 15px;
+            border-radius: 10px;
+            border-left: 4px solid;
+            max-width: 80%;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .message.user {
+            border-left-color: #0af;
+            background: rgba(0, 170, 255, 0.1);
+            align-self: flex-end;
+        }
+
+        .message.in-game {
+            border-left-color: #0f6;
+            background: rgba(0, 255, 102, 0.1);
+            align-self: flex-start;
+        }
+
+        .message.external {
+            border-left-color: #f90;
+            background: rgba(255, 153, 0, 0.1);
+            align-self: flex-start;
+        }
+
+        .message.system {
+            border-left-color: #888;
+            background: rgba(136, 136, 136, 0.1);
+            align-self: center;
+            max-width: 90%;
+            font-size: 11px;
+            color: #aaa;
+            text-align: center;
+        }
+
+        .message-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 5px;
+        }
+
+        .message-sender {
+            font-weight: bold;
+            font-size: 13px;
+        }
+
+        .message.user .message-sender { color: #0af; }
+        .message.in-game .message-sender { color: #0f6; }
+        .message.external .message-sender { color: #f90; }
+
+        .message-time {
+            font-size: 10px;
+            color: #888;
+        }
+
+        .message-content {
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .message-visual {
+            margin-top: 10px;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 5px;
+            overflow: hidden;
+            cursor: pointer;
+        }
+
+        .message-visual img {
+            width: 100%;
+            display: block;
+        }
+
+        .message-gamestate {
+            margin-top: 8px;
+            padding: 8px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 5px;
+            font-size: 11px;
+            color: #aaa;
+        }
+
+        .input-area {
+            background: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            border-top: 2px solid rgba(255, 0, 255, 0.3);
+            display: flex;
+            gap: 10px;
+        }
+
+        .input-wrapper {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .input-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        #message-input {
+            flex: 1;
+            padding: 12px 15px;
+            background: rgba(0, 0, 0, 0.5);
+            border: 2px solid #0af;
+            border-radius: 8px;
+            color: #fff;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            resize: none;
+            max-height: 100px;
+        }
+
+        #message-input:focus {
+            outline: none;
+            border-color: #0cf;
+            box-shadow: 0 0 15px rgba(0, 170, 255, 0.3);
+        }
+
+        #send-button {
+            padding: 12px 25px;
+            background: linear-gradient(135deg, #0af 0%, #08d 100%);
+            border: none;
+            border-radius: 8px;
+            color: #fff;
+            font-weight: bold;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: 'Courier New', monospace;
+        }
+
+        #send-button:hover {
+            background: linear-gradient(135deg, #0cf 0%, #0af 100%);
+            box-shadow: 0 0 20px rgba(0, 170, 255, 0.5);
+            transform: translateY(-2px);
+        }
+
+        #send-button:active {
+            transform: translateY(0);
+        }
+
+        .quick-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .quick-btn {
+            padding: 6px 12px;
+            background: rgba(255, 0, 255, 0.2);
+            border: 1px solid #f0f;
+            border-radius: 5px;
+            color: #f0f;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: 'Courier New', monospace;
+        }
+
+        .quick-btn:hover {
+            background: rgba(255, 0, 255, 0.3);
+            border-color: #f6f;
+        }
+
+        .sidebar {
+            width: 300px;
+            background: rgba(0, 0, 0, 0.7);
+            border-left: 2px solid rgba(255, 0, 255, 0.3);
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .sidebar-section {
+            margin-bottom: 20px;
+        }
+
+        .sidebar-title {
+            font-size: 12px;
+            font-weight: bold;
+            color: #f0f;
+            margin-bottom: 10px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid rgba(255, 0, 255, 0.3);
+        }
+
+        .game-state-display {
+            font-size: 11px;
+            line-height: 1.6;
+            color: #aaa;
+        }
+
+        .game-state-display .label {
+            color: #0f6;
+            font-weight: bold;
+        }
+
+        ::-webkit-scrollbar {
+            width: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 0, 255, 0.5);
+            border-radius: 5px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 0, 255, 0.7);
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>
+            <span>🤝</span>
+            <span>AI Collaboration Chat</span>
+        </h1>
+        <div class="status">
+            <div class="status-dot" id="status-dot"></div>
+            <span id="status-text">Connecting...</span>
+        </div>
+    </div>
+
+    <div class="participants">
+        <div class="participant user">
+            <span>👤</span>
+            <span>YOU</span>
+        </div>
+        <div class="participant in-game">
+            <span>🎮</span>
+            <span>IN-GAME AI</span>
+        </div>
+        <div class="participant external">
+            <span>🤖</span>
+            <span>EXTERNAL AI (Claude)</span>
+        </div>
+    </div>
+
+    <div class="chat-container">
+        <div class="chat-messages" id="chat-messages">
+            <!-- Messages appear here -->
+        </div>
+
+        <div class="sidebar">
+            <div class="sidebar-section">
+                <div class="sidebar-title">📊 Game State</div>
+                <div class="game-state-display" id="game-state-display">
+                    <div>Waiting for data...</div>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="sidebar-title">ℹ️ Info</div>
+                <div style="font-size: 11px; line-height: 1.5; color: #aaa;">
+                    <strong style="color: #0af;">YOU:</strong> Type messages below<br>
+                    <strong style="color: #0f6;">IN-GAME AI:</strong> Sends questions & visuals<br>
+                    <strong style="color: #f90;">EXTERNAL AI:</strong> Provides answers
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="input-area">
+        <div class="input-wrapper">
+            <div class="input-controls">
+                <textarea
+                    id="message-input"
+                    placeholder="Type your message... (Press Enter to send, Shift+Enter for new line)"
+                    rows="2"
+                ></textarea>
+                <button id="send-button">📤 Send</button>
+            </div>
+            <div class="quick-actions">
+                <button class="quick-btn" onclick="sendQuickMessage('What do you both see?')">What do you see?</button>
+                <button class="quick-btn" onclick="sendQuickMessage('Is the player stuck?')">Is player stuck?</button>
+                <button class="quick-btn" onclick="sendQuickMessage('What should we do?')">What should we do?</button>
+                <button class="quick-btn" onclick="sendQuickMessage('Show me the game state')">Show game state</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // WebSocket connection to bridge
+        let ws = null;
+        const WS_URL = 'ws://localhost:8081';
+        const HTTP_URL = 'http://localhost:8080';
+
+        // UI elements
+        const messagesContainer = document.getElementById('chat-messages');
+        const messageInput = document.getElementById('message-input');
+        const sendButton = document.getElementById('send-button');
+        const statusDot = document.getElementById('status-dot');
+        const statusText = document.getElementById('status-text');
+        const gameStateDisplay = document.getElementById('game-state-display');
+
+        // Connect to bridge
+        function connect() {
+            statusText.textContent = 'Connecting...';
+            statusDot.classList.remove('connected');
+
+            ws = new WebSocket(WS_URL);
+
+            ws.onopen = () => {
+                console.log('Connected to collaboration bridge');
+                statusText.textContent = 'Connected';
+                statusDot.classList.add('connected');
+                addSystemMessage('Connected to AI Collaboration Bridge');
+
+                // Register as user/chat client
+                ws.send(JSON.stringify({
+                    type: 'chat_client_connected',
+                    timestamp: new Date().toISOString()
+                }));
+            };
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                handleMessage(data);
+            };
+
+            ws.onclose = () => {
+                console.log('Disconnected from bridge');
+                statusText.textContent = 'Disconnected';
+                statusDot.classList.remove('connected');
+                addSystemMessage('Disconnected from bridge. Reconnecting in 3 seconds...');
+                setTimeout(connect, 3000);
+            };
+
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+                addSystemMessage('Connection error. Make sure the bridge is running.');
+            };
+        }
+
+        // Handle incoming messages
+        function handleMessage(data) {
+            const type = data.type;
+
+            if (type === 'ai_question_notification' || type === 'ai_question') {
+                // In-game AI asked a question
+                addMessage('in-game', 'In-Game AI', data.question, {
+                    hasVisual: data.has_visual || data.visualData,
+                    visualData: data.visualData,
+                    gameState: data.gameState,
+                    timestamp: data.timestamp
+                });
+
+                if (data.gameState) {
+                    updateGameState(data.gameState);
+                }
+            } else if (type === 'ai_answer') {
+                // External AI answered
+                addMessage('external', 'External AI (Claude)', data.answer, {
+                    timestamp: data.timestamp
+                });
+            } else if (type === 'user_message') {
+                // Another user sent a message (shouldn't happen, but handle it)
+                addMessage('user', 'User', data.message, {
+                    timestamp: data.timestamp
+                });
+            } else if (type === 'chat_message') {
+                // General chat message
+                addMessage(data.sender, data.sender_name, data.message, {
+                    timestamp: data.timestamp
+                });
+            }
+        }
+
+        // Add message to chat
+        function addMessage(sender, senderName, content, options = {}) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}`;
+
+            const headerDiv = document.createElement('div');
+            headerDiv.className = 'message-header';
+
+            const senderSpan = document.createElement('span');
+            senderSpan.className = 'message-sender';
+            senderSpan.textContent = senderName;
+
+            const timeSpan = document.createElement('span');
+            timeSpan.className = 'message-time';
+            const time = options.timestamp ? new Date(options.timestamp).toLocaleTimeString() : new Date().toLocaleTimeString();
+            timeSpan.textContent = time;
+
+            headerDiv.appendChild(senderSpan);
+            headerDiv.appendChild(timeSpan);
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            contentDiv.textContent = content;
+
+            messageDiv.appendChild(headerDiv);
+            messageDiv.appendChild(contentDiv);
+
+            // Add visual context if available
+            if (options.visualData) {
+                const visualDiv = document.createElement('div');
+                visualDiv.className = 'message-visual';
+                const img = document.createElement('img');
+                img.src = options.visualData;
+                img.alt = 'Visual context';
+                img.onclick = () => window.open(options.visualData);
+                visualDiv.appendChild(img);
+                messageDiv.appendChild(visualDiv);
+            } else if (options.hasVisual) {
+                const visualNote = document.createElement('div');
+                visualNote.className = 'message-gamestate';
+                visualNote.textContent = '👁️ Visual context included (check external AI connector for screenshot)';
+                messageDiv.appendChild(visualNote);
+            }
+
+            // Add game state if available
+            if (options.gameState) {
+                const gameStateDiv = document.createElement('div');
+                gameStateDiv.className = 'message-gamestate';
+                const player = options.gameState.player || {};
+                gameStateDiv.innerHTML = `
+                    <strong>Game State:</strong><br>
+                    Position: (${player.x?.toFixed(2) || 0}, ${player.y?.toFixed(2) || 0}, ${player.z?.toFixed(2) || 0})<br>
+                    On Ground: ${player.onGround ? 'Yes' : 'No'}
+                `;
+                messageDiv.appendChild(gameStateDiv);
+            }
+
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        // Add system message
+        function addSystemMessage(content) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message system';
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            contentDiv.textContent = content;
+
+            messageDiv.appendChild(contentDiv);
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        // Update game state display
+        function updateGameState(gameState) {
+            const player = gameState.player || {};
+            const velocity = player.velocity || {};
+
+            gameStateDisplay.innerHTML = `
+                <div><span class="label">Position:</span></div>
+                <div style="margin-left: 10px;">
+                    X: ${player.x?.toFixed(2) || 0}<br>
+                    Y: ${player.y?.toFixed(2) || 0}<br>
+                    Z: ${player.z?.toFixed(2) || 0}
+                </div>
+                <div style="margin-top: 8px;"><span class="label">Velocity:</span></div>
+                <div style="margin-left: 10px;">
+                    X: ${velocity.x?.toFixed(2) || 0}<br>
+                    Y: ${velocity.y?.toFixed(2) || 0}<br>
+                    Z: ${velocity.z?.toFixed(2) || 0}
+                </div>
+                <div style="margin-top: 8px;">
+                    <span class="label">On Ground:</span> ${player.onGround ? 'Yes' : 'No'}
+                </div>
+            `;
+        }
+
+        // Send message
+        function sendMessage() {
+            const message = messageInput.value.trim();
+            if (!message || !ws || ws.readyState !== WebSocket.OPEN) return;
+
+            // Send to bridge
+            ws.send(JSON.stringify({
+                type: 'user_message',
+                message: message,
+                timestamp: new Date().toISOString()
+            }));
+
+            // Display in chat
+            addMessage('user', 'YOU', message, {
+                timestamp: new Date().toISOString()
+            });
+
+            messageInput.value = '';
+        }
+
+        // Quick message
+        function sendQuickMessage(message) {
+            messageInput.value = message;
+            sendMessage();
+        }
+
+        // Event listeners
+        sendButton.addEventListener('click', sendMessage);
+        messageInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        // Connect on load
+        connect();
+
+        // Welcome message
+        setTimeout(() => {
+            addSystemMessage('🎉 Welcome to AI Collaboration Chat!');
+            addSystemMessage('You can now talk with both the in-game AI and external AI (Claude) in real-time.');
+        }, 500);
+    </script>
+</body>
+</html>
