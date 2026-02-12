@@ -1,0 +1,15 @@
+[2026-02-11 17:32:23,352] [CLINE] INFO: ============================================================
+[2026-02-11 17:32:23,352] [CLINE] INFO: ============================================================
+[2026-02-11 17:32:23,352] [CLINE] INFO: Status: idle
+[2026-02-11 17:32:23,353] [CLINE] INFO: Current Task: None
+[2026-02-11 17:32:23,353] [CLINE] INFO: Progress: 0%
+[2026-02-11 17:32:23,353] [CLINE] INFO: Completed Tasks: 0
+[2026-02-11 17:32:23,353] [CLINE] INFO: Failed Tasks: 0
+[2026-02-11 17:32:23,353] [CLINE] INFO: Recent Activities: 0
+[2026-02-11 17:32:23,353] [CLINE] INFO: ============================================================
+[2026-02-11 17:32:23,353] [CLINE] INFO: 
+Usage:
+[2026-02-11 17:32:23,353] [CLINE] INFO:   python cline_collaboration_bridge.py submit <objective>
+[2026-02-11 17:32:23,353] [CLINE] INFO:   python cline_collaboration_bridge.py status
+[2026-02-11 17:32:23,353] [CLINE] INFO:   python cline_collaboration_bridge.py test
+[2026-02-11 17:32:23,353] [CLINE] INFO:   python cline_collaboration_bridge.py commit <message>

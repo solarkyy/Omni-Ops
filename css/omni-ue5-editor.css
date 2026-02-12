@@ -1,0 +1,40 @@
+#ue5-editor{position:fixed;top:0;left:0;width:100%;height:100%;background:linear-gradient(135deg,#1a1a1a,#0a0a0a);display:none;z-index:600;color:#e0e0e0;font-family:"Segoe UI",sans-serif;flex-direction:column}#ue5-editor.active{display:flex}.ue5-menubar{height:40px;background:linear-gradient(180deg,#2d2d2d,#1f1f1f);border-bottom:1px solid #0d0d0d;display:flex;align-items:center;padding:0 10px;gap:5px}.ue5-menu-item{padding:8px 16px;font-size:13px;cursor:pointer;transition:.2s;border-radius:3px}.ue5-menu-item:hover{background:rgba(255,255,255,.1);color:#00d9ff}.ue5-logo{font-weight:700;font-size:16px;color:#00d9ff;margin-right:20px}.ue5-content{flex:1;display:flex;overflow:hidden}.ue5-content-browser{width:280px;background:#1e1e1e;border-right:1px solid #0d0d0d;display:flex;flex-direction:column}.ue5-panel-header{height:35px;background:#252525;border-bottom:1px solid #0d0d0d;display:flex;align-items:center;padding:0 12px;font-size:12px;font-weight:600;color:#b0b0b0}.ue5-panel-content{flex:1;overflow-y:auto;padding:10px}.ue5-asset-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:10px;margin-top:10px}.ue5-asset{background:#2a2a2a;border:2px solid transparent;border-radius:5px;padding:8px;text-align:center;cursor:pointer;transition:.2s;display:flex;flex-direction:column;align-items:center}.ue5-asset:hover{background:#333;border-color:#00d9ff;transform:scale(1.05)}.ue5-asset-icon{font-size:32px;margin-bottom:5px}.ue5-asset-name{font-size:10px;color:#b0b0b0}.ue5-viewport{flex:1;display:flex;flex-direction:column;background:#121212}.ue5-viewport-header{height:45px;background:#1a1a1a;border-bottom:1px solid #0d0d0d;display:flex;align-items:center;padding:0 15px;gap:10px}.ue5-tool-button{background:#2a2a2a;border:1px solid #444;color:#e0e0e0;padding:8px 14px;border-radius:3px;cursor:pointer;transition:.2s;font-size:12px}.ue5-tool-button:hover{background:#0066cc}.ue5-viewport-canvas{flex:1;position:relative;background:radial-gradient(circle,#1a1a1a,#0a0a0a)}.ue5-stats{position:absolute;bottom:10px;left:10px;background:rgba(0,0,0,.8);padding:10px;border-radius:5px;font-size:11px;font-family:monospace;border:1px solid #333}.ue5-stats-row{display:flex;justify-content:space-between;margin:3px 0;gap:15px}.ue5-stats-label{color:#888}.ue5-stats-value{color:#00d9ff;font-weight:700}.ue5-details-panel{width:350px;background:#1e1e1e;border-left:1px solid #0d0d0d;overflow-y:auto;padding:15px}
+
+/* Editor overlay compatibility styles (used by index.html editor-overlay) */
+#editor-overlay {
+	position: fixed;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	background: rgba(0, 0, 0, 0.97);
+	display: none;
+	z-index: 600;
+	color: #00ffcc;
+	font-family: 'Segoe UI', Tahoma, sans-serif;
+	-webkit-font-smoothing: antialiased;
+}
+#editor-overlay.active { display: flex; }
+.editor-sidebar {
+	width: 280px;
+	background: linear-gradient(180deg,#041514,#06221a);
+	border-right: 2px solid #00ffcc;
+	overflow-y: auto;
+	padding: 15px;
+}
+.editor-main { flex: 1; display: flex; flex-direction: column; }
+.editor-toolbar { height: 50px; background: linear-gradient(180deg,#071c1a,#04201c); border-bottom: 2px solid #00ffcc; display:flex; align-items:center; padding:0 15px; gap:10px }
+.editor-viewport { flex: 1; position: relative; }
+.editor-properties { width: 320px; background: linear-gradient(180deg,#041514,#06221a); border-left: 2px solid #00ffcc; overflow-y:auto; padding:15px }
+.editor-tab { background: rgba(0, 255, 204, 0.06); border: 1px solid #00ffcc; color: #00ffcc; padding:8px 15px; margin:5px 0; cursor:pointer; transition:0.2s; width:100%; font-weight:bold; font-size:12px; text-align:left }
+.editor-tab:hover{ background: rgba(0,255,204,0.12); box-shadow: 0 0 10px rgba(0,255,204,0.15) }
+.editor-tab.active{ background:#00ffcc; color:#000 }
+.editor-section{ display:none; margin-top:10px }
+.editor-section.active{ display:block }
+.editor-tool-btn{ background: rgba(0,255,204,0.08); border: 2px solid #00ffcc; color:#00ffcc; padding:6px 12px; cursor:pointer; transition:0.2s; font-weight:bold; font-size:11px }
+.editor-tool-btn:hover{ background:#00ffcc; color:#000 }
+.spawn-palette{ display:grid; grid-template-columns: repeat(3,1fr); gap:8px; margin-top:8px }
+.spawn-item{ background: rgba(0,255,204,0.06); border:1px solid #00ffcc; padding:12px; text-align:center; cursor:pointer; transition:0.15s; font-size:20px; border-radius:6px }
+.spawn-item:hover{ background: rgba(0,255,204,0.18); transform: scale(1.05) }
+.property-input{ background: #000; border:1px solid #00ffcc; color:#00ffcc; padding:6px; width:100%; margin:6px 0; font-family: 'Segoe UI', Tahoma, sans-serif }
+.editor-header{ font-size:20px; font-weight:700; margin-bottom:15px; text-align:center; color:#00d9ff }

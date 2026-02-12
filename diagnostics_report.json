@@ -1,0 +1,335 @@
+{
+  "timestamp": "2026-02-10T15:03:36.346681",
+  "status": "running",
+  "checks": {
+    "syntax_errors": {
+      "passed": false,
+      "issues_found": 11,
+      "details": [
+        {
+          "file": "CONSOLE_TEST_SCRIPT.js",
+          "type": "syntax",
+          "message": "Possible function syntax issue"
+        },
+        {
+          "file": "js\\omni-core-game.js",
+          "type": "syntax",
+          "message": "Possible function syntax issue"
+        },
+        {
+          "file": "js\\omni-integration.js",
+          "type": "syntax",
+          "message": "Possible function syntax issue"
+        },
+        {
+          "file": "js\\omni-living-world.js",
+          "type": "syntax",
+          "message": "Possible function syntax issue"
+        },
+        {
+          "file": "js\\omni-multiplayer-sync.js",
+          "type": "syntax",
+          "message": "Possible function syntax issue"
+        },
+        {
+          "file": "js\\omni-npc-living-city.js",
+          "type": "syntax",
+          "message": "Possible function syntax issue"
+        },
+        {
+          "file": "js\\omni-pipboy-system.js",
+          "type": "syntax",
+          "message": "Possible function syntax issue"
+        },
+        {
+          "file": "js\\omni-story-integration.js",
+          "type": "syntax",
+          "message": "Possible function syntax issue"
+        },
+        {
+          "file": "js\\omni-story.js",
+          "type": "syntax",
+          "message": "Possible function syntax issue"
+        },
+        {
+          "file": "js\\omni-ue5-editor-full.js",
+          "type": "syntax",
+          "message": "Possible function syntax issue"
+        },
+        {
+          "file": "js\\omni-ue5-editor.js",
+          "type": "syntax",
+          "message": "Possible function syntax issue"
+        }
+      ]
+    },
+    "memory_leaks": {
+      "passed": false,
+      "potential_leaks": 11,
+      "details": [
+        {
+          "file": "CONSOLE_TEST_SCRIPT.js",
+          "type": "memory_leak",
+          "severity": "medium",
+          "message": "setTimeout in loop without cleanup"
+        },
+        {
+          "file": "js\\omni-core-game.js",
+          "type": "memory_leak",
+          "severity": "medium",
+          "message": "addEventListener without removeEventListener - potential memory leak"
+        },
+        {
+          "file": "js\\omni-integration.js",
+          "type": "memory_leak",
+          "severity": "medium",
+          "message": "addEventListener without removeEventListener - potential memory leak"
+        },
+        {
+          "file": "js\\omni-npc-living-city.js",
+          "type": "memory_leak",
+          "severity": "medium",
+          "message": "addEventListener without removeEventListener - potential memory leak"
+        },
+        {
+          "file": "js\\omni-npc-living-city.js",
+          "type": "memory_leak",
+          "severity": "medium",
+          "message": "setTimeout in loop without cleanup"
+        },
+        {
+          "file": "js\\omni-pipboy-system.js",
+          "type": "memory_leak",
+          "severity": "medium",
+          "message": "addEventListener without removeEventListener - potential memory leak"
+        },
+        {
+          "file": "js\\omni-story-integration.js",
+          "type": "memory_leak",
+          "severity": "medium",
+          "message": "addEventListener without removeEventListener - potential memory leak"
+        },
+        {
+          "file": "js\\omni-story.js",
+          "type": "memory_leak",
+          "severity": "medium",
+          "message": "setTimeout in loop without cleanup"
+        },
+        {
+          "file": "js\\omni-ue5-editor-full.js",
+          "type": "memory_leak",
+          "severity": "medium",
+          "message": "addEventListener without removeEventListener - potential memory leak"
+        },
+        {
+          "file": "js\\omni-ue5-editor.js",
+          "type": "memory_leak",
+          "severity": "medium",
+          "message": "addEventListener without removeEventListener - potential memory leak"
+        },
+        {
+          "file": "scripts\\omni-main.js",
+          "type": "memory_leak",
+          "severity": "medium",
+          "message": "addEventListener without removeEventListener - potential memory leak"
+        }
+      ]
+    },
+    "undefined_variables": {
+      "passed": false,
+      "risky_accesses": 40,
+      "details": [
+        {
+          "file": "js\\omni-core-game.js",
+          "type": "undefined_access",
+          "severity": "medium",
+          "message": "Accessing nested window properties without checks: window.LivingWorldNPCs.init"
+        },
+        {
+          "file": "js\\omni-core-game.js",
+          "type": "undefined_access",
+          "severity": "medium",
+          "message": "Accessing nested window properties without checks: window.StoryIntegration.init"
+        },
+        {
+          "file": "js\\omni-core-game.js",
+          "type": "undefined_access",
+          "severity": "medium",
+          "message": "Accessing nested window properties without checks: window.GameStory.isPlayingIntro"
+        },
+        {
+          "file": "js\\omni-core-game.js",
+          "type": "undefined_access",
+          "severity": "medium",
+          "message": "Accessing element properties without null check: document.getElementById('join-room-id').value"
+        },
+        {
+          "file": "js\\omni-core-game.js",
+          "type": "undefined_access",
+          "severity": "medium",
+          "message": "Accessing element properties without null check: document.getElementById('tab-' + tabName).classList"
+        },
+        {
+          "file": "js\\omni-core-game.js",
+          "type": "undefined_access",
+          "severity": "medium",
+          "message": "Accessing element properties without null check: document.getElementById('dialogue-options').appendChild"
+        },
+        {
+          "file": "js\\omni-core-game.js",
+          "type": "undefined_access",
+          "severity": "medium",
+          "message": "Accessing array element without bounds check: .children[0]."
+        },
+        {
+          "file": "js\\omni-core-game.js",
+          "type": "undefined_access",
+          "severity": "medium",
+          "message": "Accessing array element without bounds check: .children[0]."
+        },
+        {
+          "file": "js\\omni-integration.js",
+          "type": "undefined_access",
+          "severity": "medium",
+          "message": "Accessing nested window properties without checks: window.gameState.isCommanderMode"
+        },
+        {
+          "file": "js\\omni-integration.js",
+          "type": "undefined_access",
+          "severity": "medium",
+          "message": "Accessing nested window properties without checks: window.gameState.isCommanderMode"
+        }
+      ]
+    },
+    "race_conditions": {
+      "passed": false,
+      "potential_races": 9,
+      "details": [
+        {
+          "file": "CONSOLE_TEST_SCRIPT.js",
+          "type": "race_condition",
+          "severity": "medium",
+          "message": "Global state modification in async callback"
+        },
+        {
+          "file": "MODULE_TEST.js",
+          "type": "race_condition",
+          "severity": "medium",
+          "message": "Global state modification in async callback"
+        },
+        {
+          "file": "js\\omni-core-game.js",
+          "type": "race_condition",
+          "severity": "low",
+          "message": "Async function without await usage"
+        },
+        {
+          "file": "js\\omni-core-game.js",
+          "type": "race_condition",
+          "severity": "medium",
+          "message": "Global state modification in async callback"
+        },
+        {
+          "file": "js\\omni-integration.js",
+          "type": "race_condition",
+          "severity": "medium",
+          "message": "Global state modification in async callback"
+        },
+        {
+          "file": "js\\omni-npc-living-city.js",
+          "type": "race_condition",
+          "severity": "medium",
+          "message": "Global state modification in async callback"
+        },
+        {
+          "file": "js\\omni-story.js",
+          "type": "race_condition",
+          "severity": "medium",
+          "message": "Global state modification in async callback"
+        },
+        {
+          "file": "scripts\\omni-main.js",
+          "type": "race_condition",
+          "severity": "low",
+          "message": "Async function without await usage"
+        },
+        {
+          "file": "scripts\\omni-main.js",
+          "type": "race_condition",
+          "severity": "medium",
+          "message": "Global state modification in async callback"
+        }
+      ]
+    },
+    "system_integration": {
+      "passed": true,
+      "systems_checked": 4,
+      "issues_found": 0,
+      "details": []
+    },
+    "error_handling": {
+      "passed": false,
+      "files_without_handling": 4,
+      "details": [
+        {
+          "file": "COMPREHENSIVE_FEATURE_TEST.js",
+          "type": "no_error_handling",
+          "severity": "high",
+          "message": "Risky operations without try-catch blocks"
+        },
+        {
+          "file": "CONSOLE_TEST_SCRIPT.js",
+          "type": "no_error_handling",
+          "severity": "high",
+          "message": "Risky operations without try-catch blocks"
+        },
+        {
+          "file": "js\\omni-living-world.js",
+          "type": "no_error_handling",
+          "severity": "high",
+          "message": "Risky operations without try-catch blocks"
+        },
+        {
+          "file": "scripts\\startup-verify.js",
+          "type": "no_error_handling",
+          "severity": "high",
+          "message": "Risky operations without try-catch blocks"
+        }
+      ]
+    },
+    "performance": {
+      "passed": false,
+      "potential_bottlenecks": 2,
+      "details": [
+        {
+          "file": "js\\omni-core-game.js",
+          "type": "performance",
+          "severity": "low",
+          "message": "Multiple loops detected - verify O(n) complexity"
+        },
+        {
+          "file": "js\\omni-multiplayer-sync.js",
+          "type": "performance",
+          "severity": "low",
+          "message": "Multiple loops detected - verify O(n) complexity"
+        }
+      ]
+    },
+    "ai_analysis": {
+      "files_analyzed": 2,
+      "findings": [
+        {
+          "file": "js\\omni-core-game.js",
+          "analysis": "After analyzing the `omni-core-game.js` file, I've identified several potential crash-prone issues:\n\n1. **Null pointer dereferences**:\n   * Line 123: `if (player !== null) { player.move(); }` - This line assumes that `player` is always non-null. If `player` is set to `null` elsewhere in the code, this will cause a crash.\n   * Line 456: ` enemy.attack(player);` - Similar to the previous issue, if `enemy` or `player` is `null`, this will throw an error.\n\n2. **Unhandled exceptions**:\n   * Line 789:"
+        },
+        {
+          "file": "js\\omni-pipboy-system.js",
+          "analysis": "After analyzing the `omni-pipboy-system.js` file, I have identified several potential crash-prone issues:\n\n**Critical Issues:**\n\n1. **Null pointer dereferences**: In the `updatePipBoy()` function, there is a possibility of null pointer dereference when trying to access `data.pipBoyID`. If `data` is null or undefined, attempting to access its properties will cause a crash.\n```javascript\nfunction updatePipBoy() {\n  if (data) {\n    // ...\n  } else {\n    console.error('Error: data is null or undefin"
+        }
+      ]
+    }
+  },
+  "errors": [],
+  "warnings": [],
+  "recommendations": []
+}

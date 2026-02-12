@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Vision & Control Dashboard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            background: #0a0a0a;
+            color: #0f0;
+            font-family: 'Courier New', monospace;
+            overflow: hidden;
+            height: 100vh;
+        }
+        
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            grid-template-rows: 1fr 1fr;
+            gap: 10px;
+            padding: 10px;
+            height: 100vh;
+        }
+        
+        .panel {
+            border: 2px solid #0f0;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            overflow-y: auto;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
+        }
+        
+        .panel h2 {
+            color: #0f0;
+            font-size: 16px;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #0f0;
+            padding-bottom: 5px;
+        }
+        
+        /* Game Frame Viewer - Full size top left */
+        #game-frame {
+            grid-column: 1 / 2;
+            grid-row: 1 / 3;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+        }
+        
+        #game-frame img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            image-rendering: pixelated;
+        }
+        
+        /* AI Analysis - Top middle */
+        #ai-analysis {
+            grid-column: 2 / 3;
+            grid-row: 1;
+        }
+        
+        /* AI Analysis Text */
+        .analysis-text {
+            font-size: 12px;
+            line-height: 1.4;
+            color: #0f0;
+            white-space: pre-wrap;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        /* Game State - Top right */
+        #game-state {
+            grid-column: 3 / 4;
+            grid-row: 1;
+        }
+        
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            border-bottom: 1px solid #0f0;
+            font-size: 12px;
+        }
+        
+        .stat-label {
+            flex: 1;
+            color: #0f0;
+        }
+        
+        .stat-value {
+            flex: 0 0 100px;
+            text-align: right;
+            color: #00ff00;
+            font-weight: bold;
+        }
+        
+        /* Control Panel - Middle */
+        #control-panel {
+            grid-column: 2 / 4;
+            grid-row: 2;
+        }
+        
+        .control-section {
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #0f0;
+        }
+        
+        .control-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        
+        button {
+            background: #0f0;
+            color: #000;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            font-size: 11px;
+            transition: all 0.2s;
+        }
+        
+        button:hover {
+            background: #00ffff;
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.5);
+        }
+        
+        button:active {
+            opacity: 0.7;
+        }
+        
+        button.secondary {
+            background: #333;
+            color: #0f0;
+            border: 1px solid #0f0;
+        }
+        
+        button.secondary:hover {
+            background: #0f0;
+            color: #000;
+        }
+        
+        input[type="text"] {
+            background: #1a1a1a;
+            border: 1px solid #0f0;
+            color: #0f0;
+            padding: 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            width: 100%;
+            margin-bottom: 8px;
+        }
+        
+        input[type="text"]::placeholder {
+            color: #0f0;
+            opacity: 0.5;
+        }
+        
+        .command-queue {
+            background: #1a1a1a;
+            border: 1px solid #0f0;
+            padding: 8px;
+            border-radius: 3px;
+            font-size: 11px;
+            max-height: 80px;
+            overflow-y: auto;
+            margin-top: 8px;
+        }
+        
+        .command-item {
+            padding: 3px 0;
+            color: #0f0;
+        }
+        
+        .command-item.active {
+            background: rgba(0, 255, 0, 0.2);
+            padding: 3px 5px;
+        }
+        
+        /* Status Indicators */
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .status-indicator.active {
+            background: #0f0;
+            box-shadow: 0 0 10px #0f0;
+        }
+        
+        .status-indicator.inactive {
+            background: #333;
+        }
+        
+        .status-row {
+            display: flex;
+            align-items: center;
+            padding: 5px 0;
+            font-size: 12px;
+        }
+        
+        /* Scrollbars */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #1a1a1a;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #0f0;
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: #00ffff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- GAME FRAME VIEWER -->
+        <div class="panel" id="game-frame">
+            <h2 style="position: absolute; top: 10px; left: 10px; z-index: 10;">AI VISUAL FEED</h2>
+            <div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; text-align: center;">
+                <div>
+                    <p>Waiting for game frames...</p>
+                    <p style="font-size: 11px; opacity: 0.7; margin-top: 10px;">Start the game at http://localhost:8000</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- AI ANALYSIS -->
+        <div class="panel" id="ai-analysis">
+            <h2>AI ANALYSIS</h2>
+            <div class="analysis-text" id="analysis-text">
+                [Waiting for frame capture and analysis...]
+            </div>
+            <button style="width: 100%; margin-top: 10px;" onclick="requestAnalysis()">
+                Analyze Current Frame
+            </button>
+        </div>
+        
+        <!-- GAME STATE -->
+        <div class="panel" id="game-state">
+            <h2>GAME STATE</h2>
+            <div id="game-state-content">
+                <div class="stat-row">
+                    <span class="stat-label">Health</span>
+                    <span class="stat-value">100/100</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Position</span>
+                    <span class="stat-value">0, 0, 0</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">On Ground</span>
+                    <span class="stat-value">Yes</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Sprinting</span>
+                    <span class="stat-value">No</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Ammo</span>
+                    <span class="stat-value">30/90</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Frames Received</span>
+                    <span class="stat-value" id="frame-count">0</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Commands Queued</span>
+                    <span class="stat-value" id="command-count">0</span>
+                </div>
+                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #0f0;">
+                    <div class="status-row">
+                        <span class="status-indicator active"></span>
+                        <span>Vision Feed <span id="feed-status">Waiting...</span></span>
+                    </div>
+                    <div class="status-row">
+                        <span class="status-indicator inactive" id="ai-status"></span>
+                        <span>AI Connection</span>
+                    </div>
+                    <div class="status-row">
+                        <span class="status-indicator inactive" id="control-status"></span>
+                        <span>Control Active</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- CONTROL PANEL -->
+        <div class="panel" id="control-panel">
+            <h2>AI CONTROL & TESTING</h2>
+            
+            <div class="control-section">
+                <div style="font-weight: bold; margin-bottom: 8px;">Direct Movement</div>
+                <div class="control-grid">
+                    <button onclick="sendCommand({type:'move', direction:'forward', duration:1})">↑ Forward</button>
+                    <button onclick="sendCommand({type:'move', direction:'back', duration:1})">↓ Back</button>
+                    <button onclick="sendCommand({type:'move', direction:'left', duration:1})">← Left</button>
+                    <button onclick="sendCommand({type:'move', direction:'right', duration:1})">→ Right</button>
+                </div>
+            </div>
+            
+            <div class="control-section">
+                <div style="font-weight: bold; margin-bottom: 8px;">Actions</div>
+                <div class="control-grid">
+                    <button onclick="sendCommand({type:'action', action:'jump'})">Jump</button>
+                    <button onclick="sendCommand({type:'action', action:'crouch'})">Crouch</button>
+                    <button onclick="sendCommand({type:'action', action:'sprint'})">Sprint</button>
+                    <button onclick="sendCommand({type:'action', action:'shoot'})">Shoot</button>
+                    <button onclick="sendCommand({type:'action', action:'reload'})">Reload</button>
+                    <button onclick="sendCommand({type:'action', action:'look_around'})">Look Around</button>
+                </div>
+            </div>
+            
+            <div class="control-section">
+                <div style="font-weight: bold; margin-bottom: 8px;">Feature Testing</div>
+                <input type="text" id="feature-name" placeholder="Feature name (e.g., wall_run)">
+                <button style="width: 100%; margin-bottom: 8px;" onclick="startFeatureTest()">
+                    Test Feature
+                </button>
+                <div style="font-size: 11px; color: #0f0; margin-top: 8px;">
+                    AI will auto-generate test sequence and execute it.
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- WebSocket/API Handler -->
+    <script>
+        const API_BASE = 'http://127.0.0.1:8081';
+        let frameCount = 0;
+        let lastAnalysis = null;
+        
+        // Poll for frame updates
+        async function updateGameFrame() {
+            try {
+                // This would normally get from the server, but for now we'll monitor locally
+                const response = await fetch(`${API_BASE}/api/debug/state`);
+                const data = await response.json();
+                
+                // Update display
+                frameCount++;
+                document.getElementById('frame-count').textContent = frameCount;
+                
+                // Update state from API
+                if (data.perception_state && data.perception_state.game_state) {
+                    updateGameState(data.perception_state.game_state);
+                }
+                
+                // Update command queue
+                document.getElementById('command-count').textContent = data.queue_length || 0;
+                
+                // Update status indicators
+                const now = Date.now();
+                if (data.perception_state.last_frame_time && (now - data.perception_state.last_frame_time * 1000) < 1000) {
+                    document.getElementById('ai-status').classList.add('active');
+                    document.getElementById('ai-status').classList.remove('inactive');
+                    document.getElementById('feed-status').textContent = 'Connected';
+                } else {
+                    document.getElementById('feed-status').textContent = 'Searching...';
+                }
+                
+            } catch (e) {
+                console.warn('Update failed:', e.message);
+            }
+        }
+        
+        function updateGameState(state) {
+            if (!state.player) return;
+            
+            const p = state.player;
+            const pos = p.position || [0, 0, 0];
+            const health = Math.round(p.health || 0);
+            const max = p.maxHealth || 100;
+            
+            document.getElementById('game-state-content').innerHTML = `
+                <div class="stat-row">
+                    <span class="stat-label">Health</span>
+                    <span class="stat-value">${health}/${max}</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Position</span>
+                    <span class="stat-value">${pos[0].toFixed(1)}, ${pos[1].toFixed(1)}, ${pos[2].toFixed(1)}</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">On Ground</span>
+                    <span class="stat-value">${p.onGround ? 'Yes' : 'No'}</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Sprinting</span>
+                    <span class="stat-value">${p.sprinting ? 'Yes' : 'No'}</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Crouching</span>
+                    <span class="stat-value">${p.crouching ? 'Yes' : 'No'}</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Ammo</span>
+                    <span class="stat-value">${state.weapon?.ammo || 0}/${state.weapon?.reserve || 0}</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Frames Received</span>
+                    <span class="stat-value" id="frame-count">${frameCount}</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Commands Queued</span>
+                    <span class="stat-value" id="command-count">0</span>
+                </div>
+                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #0f0;">
+                    <div class="status-row">
+                        <span class="status-indicator active"></span>
+                        <span>Vision Feed <span id="feed-status">Connected</span></span>
+                    </div>
+                    <div class="status-row">
+                        <span class="status-indicator active" id="ai-status"></span>
+                        <span>AI Connection</span>
+                    </div>
+                    <div class="status-row">
+                        <span class="status-indicator active" id="control-status"></span>
+                        <span>Control Active</span>
+                    </div>
+                </div>
+            `;
+        }
+        
+        async function sendCommand(cmd) {
+            try {
+                const response = await fetch(`${API_BASE}/api/control/queue-commands`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ commands: [cmd] })
+                });
+                const data = await response.json();
+                console.log('Command queued:', cmd);
+                document.getElementById('command-count').textContent = data.queue_length || 0;
+            } catch (e) {
+                console.error('Command failed:', e);
+            }
+        }
+        
+        async function requestAnalysis() {
+            try {
+                const response = await fetch(`${API_BASE}/api/vision/analyze`, { method: 'POST' });
+                const data = await response.json();
+                
+                if (data.analysis) {
+                    document.getElementById('analysis-text').textContent = data.analysis;
+                    lastAnalysis = data.analysis;
+                }
+            } catch (e) {
+                console.error('Analysis failed:', e);
+            }
+        }
+        
+        async function startFeatureTest() {
+            const featureName = document.getElementById('feature-name').value;
+            if (!featureName) {
+                alert('Enter feature name');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/test/start-feature-test`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        feature_name: featureName,
+                        feature_code: 'Auto-generated feature'
+                    })
+                });
+                const data = await response.json();
+                console.log('Feature test started:', data);
+                alert(`Test started: ${data.test_id}\n${data.sequence_length} commands queued`);
+            } catch (e) {
+                console.error('Test start failed:', e);
+            }
+        }
+        
+        // Start polling
+        setInterval(updateGameFrame, 500);
+        updateGameFrame();
+    </script>
+</body>
+</html>

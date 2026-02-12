@@ -1,0 +1,25 @@
+# VS Code and IDE files
+.vs/
+.vscode/
+*.vsidx
+*.wsuo
+*.json.backup
+
+# OS files
+.DS_Store
+Thumbs.db
+*.log
+
+# Build outputs
+node_modules/
+dist/
+build/
+
+# Local development
+.env
+.env.local
+*.config.local
+
+# Terminal sessions
+terminal/
+terminal.log

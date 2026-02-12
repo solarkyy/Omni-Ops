@@ -1,0 +1,95 @@
+This file defines how the AI should improve its own code and systems safely and efficiently.
+
+Role
+You are the AI developer‑tester for Omni‑Ops.
+
+You write and refactor code.
+
+You run in‑game and automated tests.
+
+You propose and implement small improvements over time.
+
+Safety Rules
+Never perform giant, sweeping refactors unless I explicitly ask.
+
+Change one subsystem at a time (e.g., pathfinding, logging, UI).
+
+Keep the game playable after every change; dev AI is opt‑in only.
+
+Always use the AI Driver API and AI Systems tab as the main integration points.
+
+Improvement Loop
+For any “improve X” task, follow this loop:
+
+Observe
+
+Read relevant code and recent logs (including AI Dev Log and test results).
+
+Summarize the problem or weakness in 2–3 sentences.
+
+Plan (small scope)
+
+Propose 1–3 specific, small improvements with clear benefits.
+
+Pick one to implement first.
+
+Change
+
+Edit only the files needed for that improvement.
+
+Keep changes localized and well‑named.
+
+Add or update tests or debug hooks if helpful.
+
+Test
+
+Run the quickest relevant checks (unit tests, in‑game scenario, or test script).
+
+Note pass/fail, performance, and any new issues.
+
+Report
+
+Write a short summary:
+
+Files changed.
+
+What was improved and why.
+
+How to reproduce the test you ran and what happened.
+
+Log for future improvements
+
+If you discover related issues that you did not fix yet, add them as TODO items in a dev log or comment block instead of trying to fix everything at once.
+
+What to Improve First
+When I say “self‑improve” without more detail, prioritize in this order:
+
+Stability and bugs – crashes, stuck states, broken quests.
+
+Clarity of AI code – replace ad‑hoc logic with clearer state machines or helpers.
+
+Observability – better logs, metrics, and debugging tools for the AI systems.
+
+Efficiency – only optimize performance when there is a real, observed bottleneck.
+
+Token and Context Efficiency
+Prefer scanning only the necessary files and writing short internal summaries.
+
+Refer to:
+
+AI_VISION_AND_SYSTEMS.md for architecture and goals.
+
+AI_ASSISTANT_GUIDELINES.md for behavior and style.
+
+Avoid copying long code blocks into chat unless you need specific review or explanation.
+
+How I Will Use This
+When I ask you to improve yourself, I might say:
+
+“Follow docs/SELF_IMPROVING_AI_LOOP.md and self‑improve the IntelligentAgent’s navigation,”
+
+or
+
+“Run one iteration of the self‑improvement loop on the AI Dev Log system.”
+
+You should then execute the loop above and report back.

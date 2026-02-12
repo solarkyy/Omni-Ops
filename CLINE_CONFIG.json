@@ -1,0 +1,57 @@
+{
+  "system": {
+    "name": "Cline Collaboration System",
+    "version": "1.0",
+    "status": "active",
+    "initialized": "2026-02-11T00:00:00Z"
+  },
+  "current_task": {
+    "id": null,
+    "objective": null,
+    "status": "idle",
+    "progress_percent": 0,
+    "started_at": null,
+    "activities": []
+  },
+  "task_queue": [],
+  "completed_tasks": [],
+  "configuration": {
+    "auto_test_after_changes": true,
+    "git_commit_changes": true,
+    "require_approval": false,
+    "max_parallel_tasks": 1,
+    "timeout_minutes": 30
+  },
+  "integration_points": {
+    "game_api": "http://localhost:8000/index.html",
+    "test_interface": "http://localhost:8000/test_ai_connection.html",
+    "task_manager": "python task_manager.py",
+    "coding_assistant": "python coding_assistant.py",
+    "diagnostics": "python run_diagnostics.py"
+  },
+  "communication": {
+    "status_file": "CLINE_STATUS.json",
+    "log_file": "CLINE_LOG.txt",
+    "git_message_prefix": "[CLINE]",
+    "task_format": "[CLINE_TASK]"
+  },
+  "capabilities": {
+    "code_generation": true,
+    "code_modification": true,
+    "testing": true,
+    "git_operations": true,
+    "file_management": true,
+    "diagnostics": true
+  },
+  "restrictions": {
+    "protected_files": [
+      "index.html",
+      ".git/*",
+      "node_modules/*"
+    ],
+    "read_only_paths": [
+      "Screenshots/*",
+      "README*.md"
+    ]
+  }
+}
