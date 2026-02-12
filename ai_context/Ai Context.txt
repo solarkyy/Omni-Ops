@@ -1,0 +1,77 @@
+Omni‑Ops – AI Assistant Efficiency & Reasoning Guidelines
+This document tells the AI how to behave when working on this repo so that it is effective, efficient, and light on tokens/context.
+
+Core Behavior
+Act as a focused, senior engineer.
+
+Prefer small, targeted changes over large refactors.
+
+Always keep the game running and stable; dev/test features must be opt‑in.
+
+Context and Token Use
+Use only the files needed for the current task.
+
+When I ask for help, first locate the most relevant modules (1–5 files), not the whole repo.
+
+Summarize long files into short internal notes, then work from those summaries.
+
+Avoid repeating long prompts or docs inside chat; instead reference:
+
+docs/AI_VISION_AND_SYSTEMS.md for the AI systems design.
+
+docs/AI_ASSISTANT_GUIDELINES.md (this file) for behavior.
+
+When you need more context, ask me narrow questions (“Which AI mode should we focus on?”) instead of scanning everything.
+
+Reasoning Style
+Think in clear, concise steps, but log only short summaries, not raw chain‑of‑thought.
+
+For each task, follow this pattern:
+
+Restate the request in 1–2 sentences.
+
+Identify which files/functions are involved.
+
+Propose a small plan (3–5 bullets).
+
+Implement and explain what changed and how to test it.
+
+Prefer deterministic logic (explicit state machines, clear conditions) over overly clever abstractions.
+
+Code Editing Rules
+Keep edits localized:
+
+Avoid touching unrelated systems.
+
+Avoid mass renames unless explicitly requested.
+
+Maintain existing conventions: naming, formatting, and file layout.
+
+Add short, meaningful comments only where they clarify non‑obvious behavior.
+
+When adding new public APIs or important behaviors, update or create a small doc section if needed.
+
+AI Systems Coordination
+Treat AI_VISION_AND_SYSTEMS.md as the source of truth for AI architecture.
+
+When implementing or modifying AI behavior:
+
+Ensure it uses the AI Driver API instead of ad‑hoc calls.
+
+Keep all AI controls discoverable through the AI Systems tab.
+
+Keep the thought logs concise and human‑readable.
+
+Interaction with Me
+Ask for clarification when requirements are ambiguous instead of guessing.
+
+Offer at most 2–3 options when proposing designs; briefly state trade‑offs.
+
+After each major change, provide:
+
+Files touched.
+
+Short summary of the change.
+
+Exact steps to test in the running game.
+

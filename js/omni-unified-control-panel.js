@@ -101,6 +101,17 @@ window.OmniUnifiedPanel = {
                             <button class="panel-btn" style="width:100%;margin:5px 0;" onclick="window.OmniUnifiedPanel.aiCommand('forward')">Move Forward</button>
                             <button class="panel-btn" style="width:100%;margin:5px 0;" onclick="window.OmniUnifiedPanel.aiCommand('patrol')">Auto Patrol</button>
                             <button class="panel-btn" style="width:100%;margin:5px 0;" onclick="window.OmniUnifiedPanel.aiCommand('engage')">Auto Engage</button>
+                            <h4 style="margin:15px 0 10px;color:#0f6;">AI Dev Command</h4>
+                            <input id="ai-command-input" type="text" placeholder="e.g., explore area y" style="width:100%;background:#111;border:1px solid #0f6;color:#0f6;padding:6px;border-radius:3px;font-family:monospace;font-size:11px;margin-bottom:6px;" />
+                            <div style="display:flex;gap:6px;">
+                                <button class="panel-btn" style="flex:1;" onclick="window.OmniUnifiedPanel.sendAICommandFromInput()">Send</button>
+                                <button class="panel-btn" style="flex:1;" onclick="window.OmniUnifiedPanel.aiCommand('status')">Status</button>
+                            </div>
+                            <h4 style="margin:15px 0 10px;color:#0f6;">Agent Bridge</h4>
+                            <button class="panel-btn" style="width:100%;margin:5px 0;background:rgba(100,200,255,0.1);border-color:#64c8ff;color:#64c8ff;" onclick="window.OmniUnifiedPanel.copySnapshot()">📋 Copy Snapshot</button>
+                            <div id="snapshot-status" style="font-size:10px;color:#0f6;margin-top:4px;padding:4px;background:rgba(0,0,0,0.3);border-radius:2px;text-align:center;display:none;">Snapshot copied!</div>
+                            <h4 style="margin:15px 0 10px;color:#0f6;">AI Dev Log</h4>
+                            <div id="ai-dev-log" style="max-height:140px;overflow-y:auto;font-size:11px;background:rgba(0,0,0,0.3);border:1px solid #333;border-radius:3px;padding:6px;">Waiting for thoughts...</div>
                         </div>
                     </div>
                     
@@ -192,6 +203,16 @@ window.OmniUnifiedPanel = {
             const content = document.getElementById('panel-content');
             content.style.display = content.style.display === 'none' ? 'block' : 'none';
         };
+
+        const commandInput = document.getElementById('ai-command-input');
+        if (commandInput) {
+            commandInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    this.sendAICommandFromInput();
+                }
+            });
+        }
     },
     
     waitForAPI(maxWait = 30000) {
@@ -324,9 +345,64 @@ window.OmniUnifiedPanel = {
             });
             return;
         }
-        
+
+        if (window.IntelligentAgent && typeof window.IntelligentAgent.onCommand === 'function') {
+            window.IntelligentAgent.onCommand(cmd);
+            console.log(`[Panel] AI Command routed: ${cmd}`);
+            return;
+        }
+
         console.log(`[Panel] AI Command: ${cmd}`);
-        alert(`AI Command "${cmd}" - This would trigger autonomous behavior`);
+        alert(`AI Command "${cmd}" - IntelligentAgent not ready`);
+    },
+
+    sendAICommandFromInput() {
+        const input = document.getElementById('ai-command-input');
+        if (!input) return;
+        const value = input.value.trim();
+        if (!value) return;
+        this.aiCommand(value);
+        input.value = '';
+    },
+
+    /**
+     * Copy current game snapshot from AgentBridge to clipboard and console
+     * Used to export state for external LLM analysis
+     */
+    copySnapshot() {
+        if (!window.AgentBridge) {
+            alert('AgentBridge not loaded!');
+            return;
+        }
+
+        try {
+            const snapshot = window.AgentBridge.exportSnapshot();
+            const jsonStr = JSON.stringify(snapshot, null, 2);
+            
+            // Copy to clipboard
+            navigator.clipboard.writeText(jsonStr).then(() => {
+                console.log('[AgentBridge] Snapshot copied to clipboard:');
+                console.log(jsonStr);
+                
+                // Show visual feedback
+                const statusEl = document.getElementById('snapshot-status');
+                if (statusEl) {
+                    statusEl.style.display = 'block';
+                    statusEl.textContent = '✓ Snapshot copied to clipboard!';
+                    setTimeout(() => {
+                        statusEl.style.display = 'none';
+                    }, 3000);
+                }
+            }).catch(err => {
+                console.error('[AgentBridge] Clipboard error:', err);
+                // Fallback: just print to console if clipboard fails
+                console.log('[AgentBridge] Snapshot (clipboard failed, check console):');
+                console.log(jsonStr);
+            });
+        } catch (err) {
+            console.error('[AgentBridge] Snapshot export error:', err);
+            alert('Failed to export snapshot: ' + err.message);
+        }
     },
     
     showErrorMessage(msg) {

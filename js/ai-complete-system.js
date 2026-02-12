@@ -108,9 +108,10 @@
         },
         
         analyzeGameStateLocally(state) {
-            if (!state) return "No game state";
+            if (!state || !state.player) return "No game state";
             
             const p = state.player;
+            const w = state.weapon || { ammo: 0, reserve: 0 };
             const insights = [];
             
             // Health analysis
@@ -135,10 +136,10 @@
             }
             
             // Ammo analysis
-            if (p.weapon.ammo < 5) {
-                insights.push(`⚠️ LOW AMMO: ${p.weapon.ammo} rounds (${p.weapon.reserve} reserve)");
+            if (w.ammo < 5) {
+                insights.push(`⚠️ LOW AMMO: ${w.ammo} rounds (${w.reserve} reserve)`);
             } else {
-                insights.push(`📦 Ammo: ${p.weapon.ammo}/${p.weapon.reserve}`);
+                insights.push(`📦 Ammo: ${w.ammo}/${w.reserve}`);
             }
             
             return insights.join("\n");

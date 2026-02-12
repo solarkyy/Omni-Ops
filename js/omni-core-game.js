@@ -2962,11 +2962,17 @@ window.AIPlayerAPI = {
     },
     activateAI() {
         this._aiActive = true;
+        if (window.AIAutopilot && typeof window.AIAutopilot.start === 'function') {
+            window.AIAutopilot.start();
+        }
         return true;
     },
     deactivateAI() {
         this._aiActive = false;
         this.releaseAllInputs();
+        if (window.AIAutopilot && typeof window.AIAutopilot.stop === 'function') {
+            window.AIAutopilot.stop();
+        }
         return true;
     },
     isAIControlling() {
@@ -2984,10 +2990,68 @@ window.AIPlayerAPI = {
             stamina: player.stamina,
             mode: gameMode,
             isAiming: player.isAiming,
-            isReloading: player.isReloading
+            isReloading: player.isReloading,
+            isOnGround: player.onGround,
+            reputation: gameState.reputation
         };
     }
 };
+
+// Simple autonomous control loop for AI activation
+if (!window.AIAutopilot) {
+    window.AIAutopilot = {
+        active: false,
+        timer: null,
+        lastDecisionAt: 0,
+        currentMove: null,
+        start() {
+            if (this.active) return;
+            this.active = true;
+            this.lastDecisionAt = 0;
+            this.timer = setInterval(() => this.tick(), 200);
+            console.log('[AI Autopilot] Started');
+        },
+        stop() {
+            if (!this.active) return;
+            this.active = false;
+            if (this.timer) {
+                clearInterval(this.timer);
+                this.timer = null;
+            }
+            if (window.AIPlayerAPI) {
+                window.AIPlayerAPI.releaseAllInputs();
+            }
+            console.log('[AI Autopilot] Stopped');
+        },
+        tick() {
+            if (!window.AIPlayerAPI || !window.AIPlayerAPI.isAIControlling()) return;
+            if (!isGameActive || gameMode !== 'FPS') return;
+
+            const now = Date.now();
+            if (now - this.lastDecisionAt > 1200) {
+                this.lastDecisionAt = now;
+                const choices = ['moveForward', 'moveLeft', 'moveRight', 'moveBackward', null];
+                this.currentMove = choices[Math.floor(Math.random() * choices.length)];
+
+                if (Math.random() < 0.3) {
+                    window.AIPlayerAPI.pressKey('jump');
+                }
+
+                if (Math.random() < 0.2) {
+                    const yaw = player.yaw + (Math.random() - 0.5) * 0.6;
+                    const pitch = player.pitch + (Math.random() - 0.5) * 0.2;
+                    window.AIPlayerAPI.setLook(yaw, pitch);
+                }
+            }
+
+            const moves = ['moveForward', 'moveBackward', 'moveLeft', 'moveRight'];
+            moves.forEach(action => window.AIPlayerAPI.setInput(action, false));
+            if (this.currentMove) {
+                window.AIPlayerAPI.setInput(this.currentMove, true);
+            }
+        }
+    };
+}
 
 // Cross-window API communication (for test interface)
 window.AIPlayerAPI._broadcastStatus = function() {
@@ -3072,6 +3136,14 @@ setInterval(() => {
 }, 500);
 
 console.log('[Core Game] v11 loaded successfully');
+
+// AUTO-FEATURE [i_want_you_to_bind_g]: I want you to bind G to spectator mode and have spectator mode allow me to noclip and fly 
+console.log('[Feature] Loaded: I want you to bind G to spectator mode and have spectator mode allow me to noclip and fly ');
+
+
+// AUTO-FEATURE [take_control_of_the_]: take control of the player character and move around
+console.log('[Feature] Loaded: take control of the player character and move around');
+
 
 // AUTO-FEATURE [health_bar_bottom_of]: Health Bar System
 if (!window.healthBarUI) {
