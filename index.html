@@ -327,11 +327,6 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-    <!-- NEW: AI Game Bridge & Unified Control Panel -->
-    <script src="js/omni-ai-game-bridge.js" defer></script>
-    <script src="js/omni-unified-control-panel.js" defer></script>
-    <!-- AI-Powered NPC Intelligence -->
-    <script src="js/omni-ai-npc-intelligence.js" defer></script>
     <script>
         // Global logging to page for debugging
         window.pageLog = [];
@@ -360,9 +355,14 @@
             }
         };
     </script>
+    <!-- CORE MODULES - MUST LOAD FIRST -->
     <script src="scripts/omni-main.js" defer></script>
     <script src="scripts/omni-diagnostics.js" defer></script>
     <script src="scripts/startup-verify.js" defer></script>
+    <!-- AI SYSTEM - LOADS AFTER CORE MODULES -->
+    <script src="js/omni-ai-game-bridge.js" defer></script>
+    <script src="js/omni-unified-control-panel.js" defer></script>
+    <script src="js/omni-ai-npc-intelligence.js" defer></script>
     <script>
         // Auto-run diagnostics after game loads (optional - user can call manually)
         window.addEventListener('load', () => {
@@ -395,6 +395,8 @@
             }
         }, 15000);
     </script>
+    <!-- AI COLLABORATION OVERLAY - In-game command center (F3 to toggle) -->
+    <script src="js/ai-collab-overlay.js" defer></script>
     <div id="page-debug-log" style="position:fixed; bottom:10px; right:10px; background:rgba(0,0,0,0.8); color:#0f6; padding:10px; font-size:10px; max-width:300px; max-height:100px; overflow-y:auto; border:1px solid #0f6; z-index:5000; pointer-events:none;"></div>
 </body>
 </html>

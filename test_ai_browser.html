@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OMNI-OPS AI System Test</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: #000;
+            color: #0f6;
+            font-family: monospace;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 32px;
+            text-shadow: 0 0 10px #0f6;
+        }
+        
+        .test-section {
+            background: rgba(0, 255, 100, 0.05);
+            border: 2px solid #0f6;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .test-section h2 {
+            font-size: 18px;
+            margin-bottom: 15px;
+            color: #0f6;
+            border-bottom: 1px solid #0f6;
+            padding-bottom: 10px;
+        }
+        
+        .test-item {
+            background: rgba(0, 0, 0, 0.5);
+            padding: 15px;
+            margin-bottom: 10px;
+            border-left: 3px solid #0f6;
+            border-radius: 3px;
+        }
+        
+        .test-item.success {
+            border-left-color: #0f0;
+            background: rgba(0, 255, 0, 0.05);
+        }
+        
+        .test-item.error {
+            border-left-color: #f00;
+            background: rgba(255, 0, 0, 0.05);
+        }
+        
+        .test-item.warning {
+            border-left-color: #ff0;
+            background: rgba(255, 255, 0, 0.05);
+        }
+        
+        .status-icon {
+            margin-right: 10px;
+            font-weight: bold;
+        }
+        
+        .test-item.success .status-icon { color: #0f0; }
+        .test-item.error .status-icon { color: #f00; }
+        .test-item.warning .status-icon { color: #ff0; }
+        
+        button {
+            background: linear-gradient(135deg, #0f6, #0d0);
+            color: #000;
+            border: 1px solid #0f6;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-family: monospace;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        
+        button:hover {
+            box-shadow: 0 0 15px #0f6;
+            transform: scale(1.05);
+        }
+        
+        button.danger {
+            background: linear-gradient(135deg, #f00, #c00);
+            color: #fff;
+            border-color: #f00;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin: 15px 0;
+        }
+        
+        .output-log {
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid #0f6;
+            border-radius: 5px;
+            padding: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 10px;
+            font-size: 11px;
+        }
+        
+        .log-entry {
+            padding: 3px 0;
+            border-bottom: 1px solid rgba(0, 255, 100, 0.1);
+        }
+        
+        .log-entry.success { color: #0f0; }
+        .log-entry.error { color: #f00; }
+        .log-entry.warning { color: #ff0; }
+        .log-entry.info { color: #0f6; }
+        
+        .info-box {
+            background: rgba(0, 255, 102, 0.1);
+            border: 1px solid #0f6;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-size: 12px;
+        }
+        
+        .ai-status {
+            font-size: 16px;
+            font-weight: bold;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 5px;
+            margin: 10px 0;
+            text-align: center;
+        }
+        
+        .ai-status.active {
+            color: #0f0;
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.5);
+        }
+        
+        .ai-status.inactive {
+            color: #f00;
+            box-shadow: 0 0 15px rgba(255, 0, 0, 0.5);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>⚡ OMNI-OPS AI SYSTEM TEST</h1>
+        
+        <!-- Status Section -->
+        <div class="test-section">
+            <h2>System Status</h2>
+            <div id="api-status" class="test-item warning">
+                <span class="status-icon">⏳</span>
+                <span>Checking API availability...</span>
+            </div>
+            <div id="ai-status" class="ai-status inactive">
+                🤖 AI INACTIVE
+            </div>
+            <div id="game-status" class="test-item">
+                <span class="status-icon">ℹ</span>
+                <span>Game Status: <strong id="game-status-text">Unknown</strong></span>
+            </div>
+        </div>
+        
+        <!-- Control Panel Section -->
+        <div class="test-section">
+            <h2>AI Controls</h2>
+            <div class="info-box">
+                <strong>Note:</strong> Make sure the game is running (open index.html in another window). The AI API must be available before using these controls.
+            </div>
+            
+            <div>
+                <h3 style="font-size:14px;margin:10px 0;color:#0f6;">AI Activation</h3>
+                <div class="button-group">
+                    <button onclick="activateAI()">▶️ Activate AI</button>
+                    <button onclick="deactivateAI()" class="danger">⏹️ Deactivate AI</button>
+                </div>
+            </div>
+            
+            <div>
+                <h3 style="font-size:14px;margin:10px 0;color:#0f6;">Movement Commands</h3>
+                <div class="button-group">
+                    <button onclick="moveCommand('moveForward')">⬆️ Forward</button>
+                    <button onclick="moveCommand('moveBackward')">⬇️ Backward</button>
+                    <button onclick="moveCommand('moveLeft')">⬅️ Left</button>
+                    <button onclick="moveCommand('moveRight')">➡️ Right</button>
+                </div>
+            </div>
+            
+            <div>
+                <h3 style="font-size:14px;margin:10px 0;color:#0f6;">Action Commands</h3>
+                <div class="button-group">
+                    <button onclick="actionCommand('jump')">💨 Jump</button>
+                    <button onclick="actionCommand('reload')">🔄 Reload</button>
+                    <button onclick="actionCommand('shoot')">🔫 Shoot</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Diagnostics Section -->
+        <div class="test-section">
+            <h2>Diagnostics</h2>
+            <div class="button-group">
+                <button onclick="runFullDiagnostic()">🔍 Run Full Diagnostic</button>
+                <button onclick="checkAPIStatus()">📊 Check API Status</button>
+                <button onclick="getGameState()">🎮 Get Game State</button>
+                <button onclick="clearLog()">🗑️ Clear Log</button>
+            </div>
+            <div id="output-log" class="output-log">
+                <div class="log-entry info">Test output will appear here...</div>
+            </div>
+        </div>
+        
+        <!-- Instructions Section -->
+        <div class="test-section">
+            <h2>Instructions</h2>
+            <div class="info-box">
+                <strong>1. Setup:</strong><br>
+                - Open the main game in another window or tab (from index.html)<br>
+                - Wait for it to fully load (see loading bar complete)<br>
+                - The game can be in the background<br>
+                <br>
+                <strong>2. Testing:</strong><br>
+                - Click "Check API Status" to verify the API is available<br>
+                - Click "Activate AI" to enable AI control<br>
+                - Use movement and action buttons to send commands<br>
+                - Check the output log for results<br>
+                <br>
+                <strong>3. Troubleshooting:</strong><br>
+                - If API is not available, make sure the game window is open<br>
+                - Check browser console (both windows) for error messages<br>
+                - Run "Run Full Diagnostic" to get detailed system info<br>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const log = document.getElementById('output-log');
+        
+        function addLog(message, type = 'info') {
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            const timestamp = new Date().toLocaleTimeString();
+            entry.textContent = `[${timestamp}] ${message}`;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+        
+        function clearLog() {
+            log.innerHTML = '';
+            addLog('Log cleared', 'info');
+        }
+        
+        function updateStatusUI() {
+            const apiStatus = document.getElementById('api-status');
+            const aiStatus = document.getElementById('ai-status');
+            const gameStatus = document.getElementById('game-status-text');
+            
+            // First try direct access (same window)
+            let apiAvailable = typeof window.AIPlayerAPI !== 'undefined';
+            let isActive = false;
+            let hasGameState = false;
+            
+            // If not direct access, try localStorage (cross-window communication)
+            if (!apiAvailable) {
+                try {
+                    const statusStr = localStorage.getItem('omni_api_status');
+                    if (statusStr) {
+                        const status = JSON.parse(statusStr);
+                        // Check if status is fresh (within last 2 seconds)
+                        if (Date.now() - status.timestamp < 2000) {
+                            apiAvailable = status.available;
+                            isActive = status.active;
+                            hasGameState = status.gameState === 'active';
+                        }
+                    }
+                } catch(e) {
+                    // localStorage read failed
+                }
+            } else {
+                // Direct access available, get real status
+                if (window.AIPlayerAPI.isAIControlling) {
+                    isActive = window.AIPlayerAPI.isAIControlling();
+                }
+                if (window.AIPlayerAPI.getGameState) {
+                    hasGameState = window.AIPlayerAPI.getGameState() !== null;
+                }
+            }
+            
+            if (!apiAvailable) {
+                apiStatus.className = 'test-item error';
+                apiStatus.innerHTML = '<span class="status-icon">✗</span><span>API Not Available - Make sure game is loaded</span>';
+                aiStatus.className = 'ai-status inactive';
+                aiStatus.textContent = '🤖 AI INACTIVE (API Not Available)';
+                gameStatus.textContent = 'Unknown';
+            } else {
+                apiStatus.className = 'test-item success';
+                apiStatus.innerHTML = '<span class="status-icon">✓</span><span>API Available</span>';
+                
+                aiStatus.className = `ai-status ${isActive ? 'active' : 'inactive'}`;
+                aiStatus.textContent = isActive ? '🤖 AI ACTIVE' : '🤖 AI INACTIVE';
+                
+                gameStatus.textContent = hasGameState ? 'Game Active' : 'Game Not Active';
+            }
+        }
+        
+        function checkAPIStatus() {
+            addLog('Checking API status...', 'info');
+            
+            let apiAvailable = typeof window.AIPlayerAPI !== 'undefined';
+            
+            // Try localStorage if direct access unavailable (cross-window scenario)
+            if (!apiAvailable) {
+                try {
+                    const statusStr = localStorage.getItem('omni_api_status');
+                    if (statusStr) {
+                        const status = JSON.parse(statusStr);
+                        if (Date.now() - status.timestamp < 2000) {
+                            apiAvailable = true;
+                            addLog('✓ AIPlayerAPI available (detected via game window)', 'success');
+                            addLog(`  - AI Active: ${status.active}`, 'info');
+                            addLog(`  - Game Status: ${status.gameState}`, 'info');
+                            updateStatusUI();
+                            return;
+                        }
+                    }
+                } catch(e) {
+                    // localStorage read failed, continue with direct check
+                }
+            }
+            
+            if (!apiAvailable) {
+                addLog('✗ APIPlayerAPI not available', 'error');
+                updateStatusUI();
+                return;
+            }
+            
+            addLog('✓ AIPlayerAPI available', 'success');
+            
+            try {
+                const isActive = window.AIPlayerAPI.isAIControlling();
+                addLog(`  - AI Active: ${isActive}`, 'info');
+            } catch (e) {
+                addLog(`  - Error checking AI status: ${e.message}`, 'error');
+            }
+            
+            try {
+                const state = window.AIPlayerAPI.getGameState();
+                if (state) {
+                    addLog(`  - Game Active: true`, 'info');
+                    addLog(`  - Position: (${state.position.x.toFixed(1)}, ${state.position.y.toFixed(1)}, ${state.position.z.toFixed(1)})`, 'info');
+                    addLog(`  - Health: ${state.health}`, 'info');
+                    addLog(`  - Ammo: ${state.ammo}/${state.reserveAmmo}`, 'info');
+                } else {
+                    addLog(`  - Game Active: false`, 'warning');
+                }
+            } catch (e) {
+                addLog(`  - Error getting game state: ${e.message}`, 'error');
+            }
+            
+            updateStatusUI();
+        }
+        
+        function activateAI() {
+            addLog('Attempting to activate AI...', 'info');
+            
+            // Try direct access first
+            if (window.AIPlayerAPI) {
+                try {
+                    window.AIPlayerAPI.activateAI();
+                    const isActive = window.AIPlayerAPI.isAIControlling();
+                    if (isActive) {
+                        addLog('✓ AI activated successfully', 'success');
+                    } else {
+                        addLog('⚠ AI activation returned false', 'warning');
+                    }
+                } catch (e) {
+                    addLog(`✗ Error activating AI: ${e.message}`, 'error');
+                }
+            } else {
+                // Try cross-window command via localStorage
+                try {
+                    localStorage.setItem('omni_api_command', JSON.stringify({ action: 'activateAI' }));
+                    addLog('✓ AI activation command sent (cross-window)', 'success');
+                } catch (e) {
+                    addLog('✗ Could not send AI activation command', 'error');
+                }
+            }
+            
+            setTimeout(() => updateStatusUI(), 500);
+        }
+        
+        function deactivateAI() {
+            addLog('Deactivating AI...', 'info');
+            
+            // Try direct access first
+            if (window.AIPlayerAPI) {
+                try {
+                    window.AIPlayerAPI.deactivateAI();
+                    const isActive = window.AIPlayerAPI.isAIControlling();
+                    if (!isActive) {
+                        addLog('✓ AI deactivated successfully', 'success');
+                    } else {
+                        addLog('⚠ AI deactivation failed (still active)', 'warning');
+                    }
+                } catch (e) {
+                    addLog(`✗ Error deactivating AI: ${e.message}`, 'error');
+                }
+            } else {
+                // Try cross-window command via localStorage
+                try {
+                    localStorage.setItem('omni_api_command', JSON.stringify({ action: 'deactivateAI' }));
+                    addLog('✓ AI deactivation command sent (cross-window)', 'success');
+                } catch (e) {
+                    addLog('✗ Could not send AI deactivation command', 'error');
+                }
+            }
+            
+            setTimeout(() => updateStatusUI(), 500);
+        }
+        
+        function moveCommand(action) {
+            addLog(`Sending movement command: ${action}`, 'info');
+            
+            // Try direct access first
+            if (window.AIPlayerAPI) {
+                try {
+                    window.AIPlayerAPI.setInput(action, true);
+                    setTimeout(() => {
+                        window.AIPlayerAPI.setInput(action, false);
+                        addLog(`✓ ${action} command completed`, 'success');
+                    }, 500);
+                } catch (e) {
+                    addLog(`✗ Error sending movement command: ${e.message}`, 'error');
+                }
+            } else {
+                // Try cross-window command via localStorage
+                try {
+                    localStorage.setItem('omni_api_command', JSON.stringify({
+                        action: 'setInput',
+                        param: { action: action, pressed: true }
+                    }));
+                    setTimeout(() => {
+                        localStorage.setItem('omni_api_command', JSON.stringify({
+                            action: 'setInput',
+                            param: { action: action, pressed: false }
+                        }));
+                        addLog(`✓ ${action} command sent (cross-window)`, 'success');
+                    }, 500);
+                } catch (e) {
+                    addLog('✗ Could not send movement command', 'error');
+                }
+            }
+        }
+        
+        function actionCommand(action) {
+            addLog(`Sending action command: ${action}`, 'info');
+            
+            // Try direct access first
+            if (window.AIPlayerAPI) {
+                try {
+                    if (action === 'shoot') {
+                        const result = window.AIPlayerAPI.shoot();
+                        addLog(`✓ Shoot command sent (result: ${result})`, 'success');
+                    } else {
+                        window.AIPlayerAPI.pressKey(action);
+                        addLog(`✓ ${action} command sent`, 'success');
+                    }
+                } catch (e) {
+                    addLog(`✗ Error sending action command: ${e.message}`, 'error');
+                }
+            } else {
+                // Try cross-window command via localStorage
+                try {
+                    const cmdObj = action === 'shoot' ?
+                        { action: 'shoot' } :
+                        { action: 'pressKey', param: { action: action } };
+                    
+                    localStorage.setItem('omni_api_command', JSON.stringify(cmdObj));
+                    addLog(`✓ ${action} command sent (cross-window)`, 'success');
+                } catch (e) {
+                    addLog('✗ Could not send action command', 'error');
+                }
+                }
+            }
+        }
+        
+        function getGameState() {
+            addLog('Retrieving game state...', 'info');
+            
+            let state = null;
+            
+            // Try direct access first
+            if (window.AIPlayerAPI && window.AIPlayerAPI.getGameState) {
+                try {
+                    state = window.AIPlayerAPI.getGameState();
+                } catch (e) {
+                    addLog(`✗ Error retrieving game state: ${e.message}`, 'error');
+                }
+            } else {
+                // Try reading from localStorage (cross-window status)
+                try {
+                    const statusStr = localStorage.getItem('omni_api_status');
+                    if (statusStr) {
+                        const status = JSON.parse(statusStr);
+                        if (Date.now() - status.timestamp < 2000) {
+                            addLog('✓ Game State (from game window):', 'success');
+                            addLog(`  AI Active: ${status.active}`, 'info');
+                            addLog(`  Game Status: ${status.gameState}`, 'info');
+                            addLog(`  Last Updated: ${new Date(status.timestamp).toLocaleTimeString()}`, 'info');
+                            return;
+                        }
+                    }
+                } catch (e) {
+                    // localStorage read failed
+                }
+                
+                addLog('✗ AI API not available', 'error');
+                return;
+            }
+            
+            if (!state) {
+                addLog('⚠ Game state is null (game may not be active)', 'warning');
+                return;
+            }
+            
+            addLog('✓ Game State Retrieved:', 'success');
+            addLog(`  Position: (${state.position.x.toFixed(2)}, ${state.position.y.toFixed(2)}, ${state.position.z.toFixed(2)})`, 'info');
+            addLog(`  Health: ${state.health}/100`, 'info');
+            addLog(`  Stamina: ${state.stamina}%`, 'info');
+            addLog(`  Ammo: ${state.ammo}/${state.reserveAmmo}`, 'info');
+            addLog(`  Mode: ${state.mode}`, 'info');
+            addLog(`  Aiming: ${state.isAiming}`, 'info');
+            addLog(`  Reloading: ${state.isReloading}`, 'info');
+        }
+        
+        function runFullDiagnostic() {
+            addLog('========== FULL DIAGNOSTIC ==========', 'info');
+            
+            // Check critical components
+            addLog('Checking critical components...', 'info');
+            
+            const checks = {
+                'THREE.js': typeof THREE !== 'undefined',
+                'PeerJS': typeof Peerjs !== 'undefined',
+                'AIPlayerAPI': typeof window.AIPlayerAPI !== 'undefined',
+                'AIGameBridgeAPI': typeof window.AIGameBridgeAPI !== 'undefined',
+                'OmniUnifiedPanel': typeof window.OmniUnifiedPanel !== 'undefined'
+            };
+            
+            Object.entries(checks).forEach(([name, available]) => {
+                const type = available ? 'success' : 'error';
+                const icon = available ? '✓' : '✗';
+                addLog(`${icon} ${name}: ${available ? 'Available' : 'Not Available'}`, type);
+            });
+            
+            // Check functions
+            if (typeof window.AIPlayerAPI === 'object') {
+                addLog('Checking AIPlayerAPI methods...', 'info');
+                const methods = ['setInput', 'setLook', 'pressKey', 'shoot', 'activateAI', 'deactivateAI', 'isAIControlling', 'getGameState'];
+                methods.forEach(method => {
+                    const available = typeof window.AIPlayerAPI[method] === 'function';
+                    const type = available ? 'success' : 'error';
+                    const icon = available ? '✓' : '✗';
+                    addLog(`  ${icon} ${method}`, type);
+                });
+            }
+            
+            // Check game state
+            addLog('Retrieving game state...', 'info');
+            getGameState();
+            
+            addLog('========== END DIAGNOSTIC ==========', 'info');
+        }
+        
+        // Update UI on load
+        window.addEventListener('load', () => {
+            addLog('Test window loaded', 'info');
+            addLog('Waiting for game API...', 'warning');
+            
+            // Check API availability periodically
+            setInterval(() => {
+                updateStatusUI();
+            }, 1000);
+        });
+        
+        // Initial check
+        setTimeout(() => {
+            updateStatusUI();
+        }, 1000);
+    </script>
+</body>
+</html>

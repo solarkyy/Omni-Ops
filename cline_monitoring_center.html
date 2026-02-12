@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Collaboration Center - Cline Monitoring</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: #000;
+            font-family: 'Courier New', monospace;
+            color: #0f6;
+            overflow: hidden;
+        }
+        
+        #main-container {
+            display: flex;
+            height: 100vh;
+            gap: 10px;
+            padding: 10px;
+        }
+        
+        .panel {
+            display: flex;
+            flex-direction: column;
+            background: rgba(0, 20, 10, 0.8);
+            border: 2px solid #0f6;
+            border-radius: 5px;
+            overflow: hidden;
+            box-shadow: 0 0 20px rgba(0, 255, 100, 0.2);
+        }
+        
+        .panel-header {
+            background: linear-gradient(135deg, #0f6, #0d0);
+            color: #000;
+            padding: 10px 15px;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .panel-content {
+            flex: 1;
+            overflow: auto;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        #chat-panel {
+            flex: 0 0 35%;
+        }
+        
+        #game-panel {
+            flex: 0 0 45%;
+        }
+        
+        #tests-panel {
+            flex: 0 0 20%;
+        }
+        
+        #chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+            scrollbar-width: thin;
+            scrollbar-color: #0f6 transparent;
+        }
+        
+        #chat-messages::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        #chat-messages::-webkit-scrollbar-thumb {
+            background: #0f6;
+            border-radius: 3px;
+        }
+        
+        .chat-msg {
+            margin-bottom: 10px;
+            padding: 8px 10px;
+            border-radius: 5px;
+            border-left: 3px solid #0f6;
+            font-size: 11px;
+            animation: slideIn 0.4s ease-out;
+            background: rgba(0, 255, 100, 0.05);
+        }
+        
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        
+        .chat-msg.you {
+            border-left-color: #0af;
+            background: rgba(0, 175, 255, 0.05);
+            margin-left: 10px;
+        }
+        
+        .chat-msg.cline {
+            border-left-color: #0f6;
+            background: rgba(0, 255, 100, 0.05);
+        }
+        
+        .chat-msg.system {
+            border-left-color: #ff0;
+            background: rgba(255, 255, 0, 0.05);
+            color: #ff0;
+        }
+        
+        .msg-header {
+            font-weight: bold;
+            font-size: 10px;
+            margin-bottom: 3px;
+            opacity: 0.7;
+        }
+        
+        .chat-msg.you .msg-header {
+            color: #0af;
+        }
+        
+        .chat-msg.cline .msg-header {
+            color: #0f6;
+        }
+        
+        #game-viewport {
+            width: 100%;
+            height: 100%;
+            background: #000;
+        }
+        
+        .progress-section {
+            padding: 10px;
+            border-bottom: 1px solid rgba(0, 255, 100, 0.2);
+        }
+        
+        .progress-label {
+            font-size: 10px;
+            color: #0af;
+            margin-bottom: 5px;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: rgba(0, 255, 100, 0.1);
+            border: 1px solid #0f6;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #0f6, #0d0);
+            width: 0%;
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 9px;
+            color: #000;
+            font-weight: bold;
+        }
+        
+        .step-list {
+            padding: 10px;
+            font-size: 10px;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+        
+        .step-item {
+            padding: 5px;
+            margin-bottom: 5px;
+            border-left: 2px solid #0f6;
+            padding-left: 8px;
+        }
+        
+        .step-item.completed {
+            color: #0f6;
+            border-left-color: #0f6;
+        }
+        
+        .step-item.in-progress {
+            color: #ff0;
+            border-left-color: #ff0;
+            animation: pulse 1s ease-in-out infinite;
+        }
+        
+        .step-item.pending {
+            color: #666;
+            border-left-color: #666;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .test-item {
+            padding: 8px;
+            border-bottom: 1px solid rgba(0, 255, 100, 0.2);
+            font-size: 10px;
+        }
+        
+        .test-status {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            margin-bottom: 2px;
+        }
+        
+        .test-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #666;
+        }
+        
+        .test-dot.pass {
+            background: #0f6;
+        }
+        
+        .test-dot.fail {
+            background: #f00;
+        }
+        
+        .test-dot.pending {
+            background: #ff0;
+        }
+        
+        #status-info {
+            padding: 10px;
+            font-size: 10px;
+            border-top: 1px solid rgba(0, 255, 100, 0.2);
+        }
+        
+        .status-line {
+            margin: 3px 0;
+        }
+        
+        .instruction-box {
+            padding: 10px;
+            background: rgba(255, 255, 0, 0.1);
+            border: 1px solid #ff0;
+            border-radius: 3px;
+            margin-bottom: 10px;
+            font-size: 10px;
+            color: #ff0;
+        }
+    </style>
+</head>
+<body>
+    <div id="main-container">
+        <!-- CHAT PANEL -->
+        <div class="panel" id="chat-panel">
+            <div class="panel-header">
+                COPILOT - CLINE MONITORING
+                <span id="chat-status">Waiting for Cline</span>
+            </div>
+            <div id="chat-messages"></div>
+        </div>
+        
+        <!-- PROGRESS PANEL -->
+        <div class="panel" id="progress-panel" style="flex: 0 0 25%; order: 2;">
+            <div class="panel-header">
+                CLINE PROGRESS TRACKER
+                <span id="progress-status">0%</span>
+            </div>
+            <div class="panel-content" style="overflow-y: auto;">
+                <div class="instruction-box">
+                    GIVE CLINE THIS TASK:
+                    Copy <strong>CLINE_EXECUTABLE_TASK.md</strong> and paste into Cline chat
+                </div>
+                
+                <div class="progress-section">
+                    <div class="progress-label">Overall Progress</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="overall-progress">0%</div>
+                    </div>
+                </div>
+                
+                <div class="progress-section">
+                    <div class="progress-label">Implementation Steps</div>
+                    <div class="step-list" id="step-list"></div>
+                </div>
+                
+                <div id="status-info">
+                    <div class="status-line">Status: <span id="task-status">Ready</span></div>
+                    <div class="status-line">Completed: <span id="completed-count">0</span>/6</div>
+                    <div class="status-line">Tests: <span id="test-count">0</span>/14</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- GAME PANEL -->
+        <div class="panel" id="game-panel" style="flex: 0 0 40%; order: 1;">
+            <div class="panel-header">
+                GAME INSTANCE (localhost:8000)
+                <span id="game-status">Loading...</span>
+            </div>
+            <iframe id="game-viewport" src="http://localhost:8000" frameborder="0"></iframe>
+        </div>
+        
+        <!-- TESTS PANEL -->
+        <div class="panel" id="tests-panel" style="flex: 0 0 20%; order: 3;">
+            <div class="panel-header">
+                TEST RESULTS
+                <span id="test-status">Pending</span>
+            </div>
+            <div id="test-results"></div>
+        </div>
+    </div>
+    
+    <script>
+        const chatMessages = document.getElementById('chat-messages');
+        let statusData = {};
+        let messageCounter = 0;
+        
+        // Load initial task status
+        async function loadTaskStatus() {
+            try {
+                const response = await fetch('CLINE_TASK_STATUS.json');
+                statusData = await response.json();
+                updateDisplay();
+            } catch (e) {
+                console.error('Failed to load status:', e);
+            }
+        }
+        
+        // Poll for status updates every 2 seconds
+        setInterval(async () => {
+            await loadTaskStatus();
+        }, 2000);
+        
+        function displayMessage(sender, content) {
+            const div = document.createElement('div');
+            div.className = `chat-msg ${sender === 'You' ? 'you' : sender === 'SYSTEM' ? 'system' : 'cline'}`;
+            const time = new Date().toLocaleTimeString();
+            div.innerHTML = `
+                <div class="msg-header">${sender} • ${time}</div>
+                <div>${content}</div>
+            `;
+            chatMessages.appendChild(div);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+            messageCounter++;
+        }
+        
+        function updateDisplay() {
+            // Update progress bar
+            const progress = statusData.progress_percent || 0;
+            document.getElementById('overall-progress').style.width = progress + '%';
+            document.getElementById('overall-progress').textContent = progress + '%';
+            document.getElementById('progress-status').textContent = progress + '%';
+            
+            // Update status
+            document.getElementById('task-status').textContent = statusData.status || 'unknown';
+            
+            // Update steps
+            const stepList = document.getElementById('step-list');
+            const steps = statusData.steps || {};
+            const completedSteps = Object.values(steps).filter(s => s.status === 'completed').length;
+            document.getElementById('completed-count').textContent = completedSteps;
+            
+            // Clear and rebuild step list
+            if (Object.keys(steps).length > 0) {
+                stepList.innerHTML = Object.entries(steps).map(([num, step]) => `
+                    <div class="step-item ${step.status}">
+                        [${step.status.toUpperCase()}] Step ${num}: ${step.name}
+                    </div>
+                `).join('');
+            }
+            
+            // Update tests
+            const testing = statusData.testing || {};
+            document.getElementById('test-count').textContent = `${testing.tests_passed || 0}/${testing.tests_total || 14}`;
+            
+            // Add status message if changed
+            if (statusData.status === 'in_progress' && messageCounter <= 1) {
+                displayMessage('SYSTEM', 'Cline is working on the task. Steps will update as they complete.');
+            }
+            
+            if (statusData.status === 'completed') {
+                displayMessage('SYSTEM', 'Task complete! All steps finished.');
+            }
+        }
+        
+        // Initial message
+        function initializeChat() {
+            displayMessage('SYSTEM', 'Cline Monitoring System Ready');
+            displayMessage('SYSTEM', '1. Copy CLINE_EXECUTABLE_TASK.md');
+            displayMessage('SYSTEM', '2. Paste into Cline chat');
+            displayMessage('SYSTEM', '3. Tell Cline to execute the task');
+            displayMessage('SYSTEM', 'Progress will appear below...');
+        }
+        
+        // Initialize
+        loadTaskStatus();
+        initializeChat();
+    </script>
+</body>
+</html>

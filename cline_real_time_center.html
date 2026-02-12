@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-Time Collaboration Center</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: #000;
+            font-family: 'Courier New', monospace;
+            color: #0f6;
+            overflow: hidden;
+        }
+        
+        #main {
+            display: grid;
+            grid-template-columns: 1fr 2fr 1fr;
+            grid-template-rows: 1fr;
+            height: 100vh;
+            gap: 8px;
+            padding: 8px;
+        }
+        
+        .panel {
+            border: 2px solid #0f6;
+            border-radius: 5px;
+            overflow: hidden;
+            background: rgba(0, 20, 10, 0.9);
+            box-shadow: 0 0 20px rgba(0, 255, 100, 0.2);
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .panel-header {
+            background: linear-gradient(135deg, #0f6, #0d0);
+            color: #000;
+            padding: 10px 15px;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #0f6;
+        }
+        
+        .panel-content {
+            flex: 1;
+            overflow: auto;
+            padding: 10px;
+        }
+        
+        #chat-messages {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        
+        .message {
+            padding: 8px;
+            border-left: 3px solid #0f6;
+            border-radius: 3px;
+            font-size: 11px;
+            animation: slideIn 0.3s ease-out;
+            background: rgba(0, 255, 100, 0.05);
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+        
+        .message.copilot {
+            border-left-color: #0af;
+            background: rgba(0, 175, 255, 0.05);
+        }
+        
+        .message.cline {
+            border-left-color: #0f6;
+            background: rgba(0, 255, 100, 0.05);
+        }
+        
+        .message.system {
+            border-left-color: #ff0;
+            background: rgba(255, 255, 0, 0.05);
+            color: #ff0;
+        }
+        
+        .message-time {
+            font-size: 10px;
+            opacity: 0.6;
+            margin-bottom: 3px;
+        }
+        
+        .message-actor {
+            font-weight: bold;
+            margin-bottom: 2px;
+            color: inherit;
+        }
+        
+        .message.copilot .message-actor {
+            color: #0af;
+        }
+        
+        .message.cline .message-actor {
+            color: #0f6;
+        }
+        
+        #game-viewport {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+        
+        .status-item {
+            padding: 6px;
+            margin: 3px 0;
+            border-left: 2px solid #0f6;
+            padding-left: 8px;
+            font-size: 10px;
+        }
+        
+        .status-value {
+            color: #0af;
+            font-weight: bold;
+        }
+        
+        .test-list {
+            font-size: 9px;
+            max-height: 100%;
+            overflow-y: auto;
+        }
+        
+        .test-item {
+            padding: 4px;
+            margin: 2px 0;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .test-indicator {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #ff0;
+        }
+        
+        .test-indicator.pass {
+            background: #0f6;
+        }
+        
+        .test-indicator.fail {
+            background: #f00;
+        }
+        
+        .test-indicator.pending {
+            background: #ff0;
+            animation: pulse 1s ease-in-out infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: rgba(0, 255, 100, 0.1);
+            border: 1px solid #0f6;
+            border-radius: 3px;
+            overflow: hidden;
+            margin: 8px 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #0f6, #0d0);
+            width: 0%;
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            color: #000;
+            font-weight: bold;
+        }
+        
+        .live-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: #0f6;
+            border-radius: 50%;
+            animation: pulse 1s ease-in-out infinite;
+            margin-right: 5px;
+        }
+        
+        .scrollable {
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: #0f6 transparent;
+        }
+        
+        .scrollable::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .scrollable::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        
+        .scrollable::-webkit-scrollbar-thumb {
+            background: #0f6;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div id="main">
+        <!-- LEFT: Chat Panel -->
+        <div class="panel">
+            <div class="panel-header">
+                <span><span class="live-indicator"></span>CHAT</span>
+                <span id="msg-count">0</span>
+            </div>
+            <div class="panel-content scrollable">
+                <div id="chat-messages"></div>
+            </div>
+        </div>
+        
+        <!-- CENTER: Game Panel -->
+        <div class="panel">
+            <div class="panel-header">
+                <span>GAME (localhost:8000)</span>
+                <span id="game-status">Loading</span>
+            </div>
+            <div class="panel-content" style="padding: 0;">
+                <iframe id="game-viewport" src="http://localhost:8000"></iframe>
+            </div>
+        </div>
+        
+        <!-- RIGHT: Status Panel -->
+        <div class="panel">
+            <div class="panel-header">
+                <span>TESTS & STATUS</span>
+                <span id="test-count">0/14</span>
+            </div>
+            <div class="panel-content scrollable">
+                <div style="margin-bottom: 15px;">
+                    <div style="color: #0af; font-weight: bold; margin-bottom: 5px;">Progress</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progress" style="width: 0%;">0%</div>
+                    </div>
+                </div>
+                
+                <div style="margin-bottom: 15px;">
+                    <div style="color: #0af; font-weight: bold; margin-bottom: 5px;">Status</div>
+                    <div class="status-item">
+                        Elapsed: <span class="status-value" id="elapsed">0s</span>
+                    </div>
+                    <div class="status-item">
+                        Messages: <span class="status-value" id="total-msgs">0</span>
+                    </div>
+                    <div class="status-item">
+                        Cline: <span class="status-value" id="cline-status">waiting</span>
+                    </div>
+                </div>
+                
+                <div>
+                    <div style="color: #0af; font-weight: bold; margin-bottom: 5px;">Tests</div>
+                    <div class="test-list" id="test-list"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const chatMessages = document.getElementById('chat-messages');
+        let collaborationData = {};
+        let messageCounter = 0;
+        let startTime = Date.now();
+        
+        // Load collaboration status
+        async function loadStatus() {
+            try {
+                const response = await fetch('REAL_TIME_STATUS.json');
+                if (response.ok) {
+                    collaborationData = await response.json();
+                    updateDisplay();
+                }
+            } catch (e) {
+                console.error('Failed to load status:', e);
+            }
+        }
+        
+        function displayMessage(actor, message, type = 'info') {
+            const div = document.createElement('div');
+            let msgType = 'system';
+            if (actor === 'COPILOT') msgType = 'copilot';
+            else if (actor === 'CLINE') msgType = 'cline';
+            
+            div.className = `message ${msgType}`;
+            div.innerHTML = `
+                <div class="message-time">${new Date().toLocaleTimeString()}</div>
+                <div class="message-actor">${actor}</div>
+                <div>${message}</div>
+            `;
+            
+            chatMessages.appendChild(div);
+            chatMessages.parentElement.scrollTop = chatMessages.parentElement.scrollHeight;
+            messageCounter++;
+        }
+        
+        function updateDisplay() {
+            // Display chat messages
+            if (collaborationData.recent_events) {
+                const displayed = document.querySelectorAll('.message').length;
+                const newEvents = collaborationData.recent_events;
+                
+                if (newEvents.length > displayed) {
+                    const toDisplay = newEvents.slice(displayed);
+                    toDisplay.forEach(event => {
+                        displayMessage(event.actor, event.message, event.type);
+                    });
+                }
+            }
+            
+            // Update counts
+            document.getElementById('msg-count').textContent = collaborationData.total_messages || 0;
+            document.getElementById('total-msgs').textContent = collaborationData.total_messages || 0;
+            
+            // Update elapsed time
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            document.getElementById('elapsed').textContent = elapsed + 's';
+            
+            // Update Cline status
+            const clineStatus = collaborationData.cline_status || 'waiting';
+            document.getElementById('cline-status').textContent = clineStatus;
+            
+            // Update game status
+            if (collaborationData.game_status && collaborationData.game_status !== 'unknown') {
+                document.getElementById('game-status').textContent = 'Running';
+            }
+        }
+        
+        // Initialize
+        function init() {
+            displayMessage('SYSTEM', 'Real-time collaboration system online');
+            displayMessage('SYSTEM', 'Waiting for Copilot to communicate with Cline...');
+            displayMessage('SYSTEM', 'Watch this dashboard for live updates!');
+            
+            // Poll for updates
+            setInterval(loadStatus, 1000);
+            
+            // Initial load
+            loadStatus();
+        }
+        
+        // Start
+        init();
+    </script>
+</body>
+</html>

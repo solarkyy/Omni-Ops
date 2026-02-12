@@ -1,0 +1,61 @@
+{
+  "task": "Wall Running - Matrix Style",
+  "status": "ready_for_cline",
+  "progress_percent": 0,
+  "current_step": "Waiting for Cline to start",
+  "completed_steps": [],
+  "in_progress_step": null,
+  "issues": [],
+  "next_action": "Copy CLINE_EXECUTABLE_TASK.md and paste into Cline",
+  "timestamp": "2026-02-11T17:58:00Z",
+  "estimated_completion": null,
+  "implementation_notes": {
+    "primary_file": "js/omni-core-game.js",
+    "feature": "Wall running with physics, camera tilt, audio, X key toggle",
+    "test_count": 14,
+    "success_criteria": "All 14 tests passing at 60fps"
+  },
+  "steps": {
+    "1": {
+      "name": "Wall Detection System",
+      "status": "pending",
+      "description": "Create raycast-based wall detection"
+    },
+    "2": {
+      "name": "Wall Running Physics",
+      "status": "pending",
+      "description": "Implement 5% reduced gravity on walls"
+    },
+    "3": {
+      "name": "Camera Tilt",
+      "status": "pending",
+      "description": "Rotate camera 15-30° toward wall"
+    },
+    "4": {
+      "name": "Exit Wall Running",
+      "status": "pending",
+      "description": "Exit on jump or direction change"
+    },
+    "5": {
+      "name": "Audio System",
+      "status": "pending",
+      "description": "Play wall-specific footstep sounds"
+    },
+    "6": {
+      "name": "X Key Toggle",
+      "status": "pending",
+      "description": "Add input detection for X key"
+    }
+  },
+  "git": {
+    "branch": "wall-running-feature",
+    "commit_message": "feat: add matrix-style wall running",
+    "pushed": false
+  },
+  "testing": {
+    "tests_passed": 0,
+    "tests_failed": 0,
+    "tests_total": 14,
+    "fps_target": 60
+  }
+}

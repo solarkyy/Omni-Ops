@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Connection Test - Auto Test</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: #000;
+            color: #0f6;
+            font-family: 'Courier New', monospace;
+            padding: 30px;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            text-align: center;
+            font-size: 36px;
+            margin-bottom: 30px;
+            text-shadow: 0 0 15px #0f6;
+            animation: glow 2s ease-in-out infinite;
+        }
+        
+        @keyframes glow {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        
+        .test-section {
+            background: rgba(0, 255, 100, 0.08);
+            border: 2px solid #0f6;
+            border-radius: 10px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 0 20px rgba(0, 255, 100, 0.3);
+        }
+        
+        .test-section h2 {
+            font-size: 20px;
+            margin-bottom: 15px;
+            color: #0f6;
+            border-bottom: 2px solid #0f6;
+            padding-bottom: 10px;
+        }
+        
+        .status-box {
+            background: rgba(0, 0, 0, 0.6);
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border-left: 5px solid #0f6;
+        }
+        
+        .status-box.success {
+            border-left-color: #0f0;
+            background: rgba(0, 255, 0, 0.08);
+        }
+        
+        .status-box.error {
+            border-left-color: #f00;
+            background: rgba(255, 0, 0, 0.08);
+        }
+        
+        .status-box.warning {
+            border-left-color: #ff0;
+            background: rgba(255, 255, 0, 0.08);
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            margin-right: 10px;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(0.9); }
+        }
+        
+        .status-indicator.green {
+            background: #0f0;
+            box-shadow: 0 0 10px #0f0;
+        }
+        
+        .status-indicator.red {
+            background: #f00;
+            box-shadow: 0 0 10px #f00;
+        }
+        
+        .status-indicator.yellow {
+            background: #ff0;
+            box-shadow: 0 0 10px #ff0;
+        }
+        
+        .log-container {
+            background: #000;
+            border: 1px solid #0f6;
+            border-radius: 5px;
+            padding: 15px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-size: 13px;
+        }
+        
+        .log-entry {
+            padding: 5px;
+            margin: 3px 0;
+            border-left: 3px solid #0f6;
+            padding-left: 10px;
+        }
+        
+        .log-entry.success {
+            border-left-color: #0f0;
+            color: #0f0;
+        }
+        
+        .log-entry.error {
+            border-left-color: #f00;
+            color: #f00;
+        }
+        
+        .log-entry.warning {
+            border-left-color: #ff0;
+            color: #ff0;
+        }
+        
+        .log-entry.info {
+            border-left-color: #0af;
+            color: #0af;
+        }
+        
+        button {
+            background: linear-gradient(135deg, #0f6, #0d0);
+            color: #000;
+            border: 2px solid #0f6;
+            padding: 12px 25px;
+            margin: 8px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            font-size: 14px;
+            transition: all 0.3s;
+            text-transform: uppercase;
+        }
+        
+        button:hover {
+            box-shadow: 0 0 20px #0f6;
+            transform: translateY(-2px);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        button.danger {
+            background: linear-gradient(135deg, #f00, #a00);
+            border-color: #f00;
+        }
+        
+        button.danger:hover {
+            box-shadow: 0 0 20px #f00;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 15px;
+        }
+        
+        .countdown {
+            font-size: 48px;
+            text-align: center;
+            margin: 20px 0;
+            color: #0f6;
+            text-shadow: 0 0 20px #0f6;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>⚡ AI CONNECTION AUTO-TEST ⚡</h1>
+        
+        <!-- Connection Status -->
+        <div class="test-section">
+            <h2>📡 Connection Status</h2>
+            <div id="connection-status" class="status-box">
+                <span class="status-indicator yellow"></span>
+                <span id="connection-text">Checking connection...</span>
+            </div>
+        </div>
+        
+        <!-- AI Status -->
+        <div class="test-section">
+            <h2>🤖 AI Status</h2>
+            <div id="ai-status" class="status-box">
+                <span class="status-indicator yellow"></span>
+                <span id="ai-status-text">Checking AI status...</span>
+            </div>
+        </div>
+        
+        <!-- Movement Test -->
+        <div class="test-section">
+            <h2>🎮 Movement Test</h2>
+            <div id="movement-status" class="status-box">
+                <span class="status-indicator yellow"></span>
+                <span id="movement-text">Waiting to test movement...</span>
+            </div>
+            <div id="countdown-display" class="countdown" style="display:none;"></div>
+        </div>
+        
+        <!-- Manual Controls -->
+        <div class="test-section">
+            <h2>🎛️ Manual Controls</h2>
+            <div class="button-group">
+                <button onclick="runFullTest()">🔄 Run Full Auto-Test</button>
+                <button onclick="testForwardMovement()">⬆️ Test Forward</button>
+                <button onclick="activateAI()">✅ Activate AI</button>
+                <button onclick="deactivateAI()" class="danger">❌ Deactivate AI</button>
+            </div>
+        </div>
+        
+        <!-- Log Output -->
+        <div class="test-section">
+            <h2>📋 Test Log</h2>
+            <div id="log-output" class="log-container">
+                <div class="log-entry info">[SYSTEM] Test interface initialized. Waiting for test to begin...</div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const logContainer = document.getElementById('log-output');
+        let testInProgress = false;
+        
+        function log(message, type = 'info') {
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            const timestamp = new Date().toLocaleTimeString();
+            entry.textContent = `[${timestamp}] ${message}`;
+            logContainer.appendChild(entry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+            console.log(`[AI Test] ${message}`);
+        }
+        
+        function updateConnectionStatus(isConnected, message) {
+            const statusBox = document.getElementById('connection-status');
+            const indicator = statusBox.querySelector('.status-indicator');
+            const text = document.getElementById('connection-text');
+            
+            if (isConnected) {
+                statusBox.className = 'status-box success';
+                indicator.className = 'status-indicator green';
+            } else {
+                statusBox.className = 'status-box error';
+                indicator.className = 'status-indicator red';
+            }
+            text.textContent = message;
+        }
+        
+        function updateAIStatus(isActive, message) {
+            const statusBox = document.getElementById('ai-status');
+            const indicator = statusBox.querySelector('.status-indicator');
+            const text = document.getElementById('ai-status-text');
+            
+            if (isActive) {
+                statusBox.className = 'status-box success';
+                indicator.className = 'status-indicator green';
+            } else {
+                statusBox.className = 'status-box warning';
+                indicator.className = 'status-indicator yellow';
+            }
+            text.textContent = message;
+        }
+        
+        function updateMovementStatus(success, message) {
+            const statusBox = document.getElementById('movement-status');
+            const indicator = statusBox.querySelector('.status-indicator');
+            const text = document.getElementById('movement-text');
+            
+            if (success) {
+                statusBox.className = 'status-box success';
+                indicator.className = 'status-indicator green';
+            } else {
+                statusBox.className = 'status-box error';
+                indicator.className = 'status-indicator red';
+            }
+            text.textContent = message;
+        }
+        
+        function checkConnection() {
+            log('Checking game connection...', 'info');
+            
+            try {
+                const statusStr = localStorage.getItem('omni_api_status');
+                if (!statusStr) {
+                    updateConnectionStatus(false, '❌ Game not detected. Please open the game in another window.');
+                    log('✗ Game API not found in localStorage', 'error');
+                    return false;
+                }
+                
+                const status = JSON.parse(statusStr);
+                const age = Date.now() - status.timestamp;
+                
+                if (age > 2000) {
+                    updateConnectionStatus(false, '⚠️ Game connection is stale. Game may not be running.');
+                    log(`✗ Game API status is ${(age/1000).toFixed(1)}s old`, 'warning');
+                    return false;
+                }
+                
+                updateConnectionStatus(true, `✓ Game connected (updated ${(age/1000).toFixed(1)}s ago)`);
+                log('✓ Game API available and responsive', 'success');
+                log(`  - Game State: ${status.gameState}`, 'info');
+                log(`  - AI Active: ${status.active}`, 'info');
+                
+                return true;
+            } catch (e) {
+                updateConnectionStatus(false, '❌ Error checking connection');
+                log(`✗ Connection check failed: ${e.message}`, 'error');
+                return false;
+            }
+        }
+        
+        function activateAI() {
+            log('Activating AI system...', 'info');
+            
+            try {
+                localStorage.setItem('omni_api_command', JSON.stringify({ action: 'activateAI' }));
+                log('✓ AI activation command sent', 'success');
+                
+                // Check result after delay
+                setTimeout(() => {
+                    const statusStr = localStorage.getItem('omni_api_status');
+                    if (statusStr) {
+                        const status = JSON.parse(statusStr);
+                        if (status.active) {
+                            updateAIStatus(true, '✓ AI System Active');
+                            log('✓ AI successfully activated', 'success');
+                        } else {
+                            updateAIStatus(false, '⚠️ AI activation may have failed');
+                            log('⚠ AI still shows as inactive', 'warning');
+                        }
+                    }
+                }, 1000);
+                
+            } catch (e) {
+                updateAIStatus(false, '❌ Failed to activate AI');
+                log(`✗ AI activation error: ${e.message}`, 'error');
+            }
+        }
+        
+        function deactivateAI() {
+            log('Deactivating AI system...', 'info');
+            
+            try {
+                localStorage.setItem('omni_api_command', JSON.stringify({ action: 'deactivateAI' }));
+                log('✓ AI deactivation command sent', 'success');
+                
+                setTimeout(() => {
+                    const statusStr = localStorage.getItem('omni_api_status');
+                    if (statusStr) {
+                        const status = JSON.parse(statusStr);
+                        if (!status.active) {
+                            updateAIStatus(false, '✓ AI System Deactivated');
+                            log('✓ AI successfully deactivated', 'success');
+                        }
+                    }
+                }, 1000);
+                
+            } catch (e) {
+                log(`✗ AI deactivation error: ${e.message}`, 'error');
+            }
+        }
+        
+        function testForwardMovement() {
+            log('Testing FORWARD movement command...', 'info');
+            updateMovementStatus(false, '⏳ Sending forward movement command...');
+            
+            try {
+                // Press forward
+                localStorage.setItem('omni_api_command', JSON.stringify({
+                    action: 'setInput',
+                    param: { action: 'moveForward', pressed: true }
+                }));
+                log('✓ Forward key PRESSED', 'success');
+                
+                // Hold for 2 seconds
+                setTimeout(() => {
+                    // Release forward
+                    localStorage.setItem('omni_api_command', JSON.stringify({
+                        action: 'setInput',
+                        param: { action: 'moveForward', pressed: false }
+                    }));
+                    log('✓ Forward key RELEASED (after 2s)', 'success');
+                    updateMovementStatus(true, '✓ Forward movement test completed (2 second movement)');
+                    
+                    // Get final position
+                    setTimeout(() => {
+                        const statusStr = localStorage.getItem('omni_api_status');
+                        if (statusStr) {
+                            const status = JSON.parse(statusStr);
+                            log(`📍 Check game window for player position change`, 'info');
+                        }
+                    }, 500);
+                    
+                }, 2000);
+                
+            } catch (e) {
+                updateMovementStatus(false, '❌ Movement test failed');
+                log(`✗ Movement test error: ${e.message}`, 'error');
+            }
+        }
+        
+        async function runFullTest() {
+            if (testInProgress) {
+                log('⚠ Test already in progress', 'warning');
+                return;
+            }
+            
+            testInProgress = true;
+            log('========================================', 'info');
+            log('🚀 STARTING FULL AUTOMATED TEST', 'info');
+            log('========================================', 'info');
+            
+            // Step 1: Check Connection
+            log('[STEP 1] Checking game connection...', 'info');
+            await sleep(500);
+            const connected = checkConnection();
+            
+            if (!connected) {
+                log('❌ TEST FAILED: Game not connected', 'error');
+                log('📋 ACTION REQUIRED: Open index.html in another window/tab and start the game', 'warning');
+                testInProgress = false;
+                return;
+            }
+            
+            await sleep(1000);
+            
+            // Step 2: Activate AI
+            log('[STEP 2] Activating AI system...', 'info');
+            activateAI();
+            await sleep(2000);
+            
+            // Verify AI is active
+            const statusStr = localStorage.getItem('omni_api_status');
+            if (!statusStr || !JSON.parse(statusStr).active) {
+                log('⚠ Warning: AI may not be active, but continuing test...', 'warning');
+            }
+            
+            // Step 3: Test Movement with countdown
+            log('[STEP 3] Testing forward movement in 3 seconds...', 'info');
+            await showCountdown(3);
+            
+            testForwardMovement();
+            
+            await sleep(3000);
+            
+            log('========================================', 'info');
+            log('✓ FULL TEST SEQUENCE COMPLETED', 'success');
+            log('========================================', 'info');
+            log('📊 Check the game window to verify player moved forward', 'info');
+            
+            testInProgress = false;
+        }
+        
+        async function showCountdown(seconds) {
+            const countdownDiv = document.getElementById('countdown-display');
+            countdownDiv.style.display = 'block';
+            
+            for (let i = seconds; i > 0; i--) {
+                countdownDiv.textContent = i;
+                await sleep(1000);
+            }
+            
+            countdownDiv.textContent = 'GO!';
+            await sleep(500);
+            countdownDiv.style.display = 'none';
+        }
+        
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+        
+        // Auto-run test on page load
+        window.addEventListener('load', () => {
+            log('✓ Auto-test interface ready', 'success');
+            log('💡 Tip: Open the game (index.html) in another window first', 'info');
+            
+            // Check connection immediately
+            setTimeout(() => {
+                checkConnection();
+            }, 1000);
+            
+            // Auto-check connection every 2 seconds
+            setInterval(() => {
+                if (!testInProgress) {
+                    checkConnection();
+                }
+            }, 2000);
+        });
+    </script>
+</body>
+</html>

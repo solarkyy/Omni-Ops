@@ -1,0 +1,15 @@
+{
+  "status": "idle",
+  "current_task": null,
+  "progress": 0,
+  "last_update": "2026-02-11T00:00:00Z",
+  "activities": [],
+  "completed_tasks": 0,
+  "failed_tasks": 0,
+  "system_health": {
+    "memory_ok": true,
+    "disk_ok": true,
+    "git_ok": true,
+    "tests_ok": true
+  }
+}

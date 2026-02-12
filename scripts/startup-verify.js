@@ -11,7 +11,10 @@ const modules = {
     'GameStory': typeof GameStory !== 'undefined',
     'ModuleLoader': typeof ModuleLoader !== 'undefined',
     'OmniDiagnostics': typeof OmniDiagnostics !== 'undefined',
-    'LivingWorldNPCs': typeof LivingWorldNPCs !== 'undefined'
+    'LivingWorldNPCs': typeof LivingWorldNPCs !== 'undefined',
+    'AIPlayerAPI': typeof window.AIPlayerAPI !== 'undefined',
+    'AIGameBridgeAPI': typeof window.AIGameBridgeAPI !== 'undefined',
+    'OmniUnifiedPanel': typeof window.OmniUnifiedPanel !== 'undefined'
 };
 
 Object.entries(modules).forEach(([name, loaded]) => {

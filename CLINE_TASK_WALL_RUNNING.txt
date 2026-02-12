@@ -1,0 +1,62 @@
+[CLINE_TASK]
+PRIORITY: HIGH
+CATEGORY: Feature
+OBJECTIVE: Implement Matrix-style wall running mechanic where the player can run on vertical walls with smooth physics and animations
+
+CONTEXT:
+- File: js/omni-core-game.js (player movement & physics system)
+- Related: player.velocity, player.onGround, camera controls
+- Current: Player can only move on ground
+- Add: Wall detection, wall-running physics, camera tilt toward wall
+- Toggle: Press 'X' key to enable/disable wall running mode
+- Physics needed: Reduce gravity on walls, maintain horizontal velocity, prevent falling
+- Audio: Play footstep sounds on walls (different from ground)
+
+IMPLEMENTATION DETAILS:
+- Wall Detection: Use raycasts to detect walls near player (radius ~2 units)
+- Physics: When on wall, set gravity to 5% normal (mostly hold player to wall)
+- Camera: Tilt toward wall by 15-30 degrees (smooth transition)
+- Jump: Player can jump off wall with normal power
+- Exit: Wall-run ends when jumping, moving away from wall, or pressing X again
+- Performance: Must maintain 60fps (check particle/object count)
+- Animation: Visual indicator when wall-running active (HUD glow or status)
+
+TESTING:
+1. Load game and spawn in main area
+2. Navigate to a wall (any vertical surface)
+3. Press 'X' to toggle wall running mode
+4. Move toward wall with W key
+5. Verify player sticks to wall and slides along it
+6. Try moving along wall horizontally with A/D keys
+7. Press Space to jump off wall
+8. Listen for wall-specific footstep sounds
+9. Verify camera tilts toward wall smoothly
+10. Check FPS remains 60+ with constant wall running
+11. Press X again to disable wall running
+12. Verify normal physics resume when disabled
+13. Test on multiple wall angles
+14. Verify HUD shows wall-running status
+
+SUCCESS CRITERIA:
+- Player can successfully wall run on vertical surfaces
+- Wall running activates with X key and toggles reliably
+- Camera tilts smoothly toward wall during wall run
+- Physics feel natural (not sliding off, gravity reduced)
+- Footstep sounds different on walls vs ground
+- No performance drop (60fps maintained)
+- Smooth exit from wall run when jumping/moving away
+- Feature can be toggled on/off without breaking physics
+- No clipping through walls
+- Works on walls of different angles
+
+DEPENDENCIES:
+- Game must be loaded
+- Player physics system must be functional
+- Audio system must support footstep variations
+- Camera control system functional
+
+BONUS (if time):
+- Add visual effect/particle trails while wall running
+- Add keybind customization
+- Add audio feedback when entering/exiting wall run
+- Add momentum/speed boost when wall running into jump

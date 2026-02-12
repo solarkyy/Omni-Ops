@@ -5,3 +5,4 @@ opentelemetry-instrumentation-requests>=0.41b0
 requests>=2.31.0
 flask>=3.0.0
 flask-cors>=4.0.0
+watchdog>=3.0.0

@@ -372,9 +372,7 @@ function showScreen(screen) {
 }
 
 // EXPOSE launchGame TO GLOBAL SCOPE
-window.launchGame = launchGame;
-window.initGame = initGame;
-window.handleInteraction = handleInteraction;
+// Moved to end of file to ensure all functions are defined
 
 window.startMode = function(mode) {
     console.log(`[startMode] Called with mode: ${mode}`);
@@ -620,14 +618,14 @@ window.initializeUI = function() {
     }
     
     const bindBtn = (id, func) => {
-        const el = document.getElementById(id);
-        if (el) {
-            console.log(`[Core Game] Binding button: ${id}`);
-            el.onclick = func;
-        } else {
-            console.warn(`[Core Game] Button not found: ${id}`);
-        }
-    };
+            const el = document.getElementById(id);
+            if (el) {
+                console.log(`[Core Game] Binding button: ${id}`);
+                el.onclick = func;
+            } else {
+                console.warn(`[Core Game] Button not found: ${id}`);
+            }
+        };
 
     bindBtn('btn-story-start', () => {
         console.log('[UI] btn-story-start clicked');
@@ -2916,5 +2914,163 @@ window.editorExport = function() {
     alert('Exported to console (check browser console)');
 };
 
-    console.log('[Core Game] v11 loaded successfully');
-})();
+// AI PLAYER API (Exposed for AI control panel and bridge)
+window.AIPlayerAPI = {
+    _aiActive: false,
+    _inputMap: {
+        moveForward: 'KeyW',
+        moveBackward: 'KeyS',
+        moveLeft: 'KeyA',
+        moveRight: 'KeyD',
+        jump: 'Space',
+        sprint: 'ShiftLeft',
+        crouch: 'ControlLeft'
+    },
+    setInput(action, pressed) {
+        const keyCode = this._inputMap[action];
+        if (!keyCode) return;
+        keys[keyCode] = !!pressed;
+    },
+    setLook(yaw, pitch) {
+        if (!isGameActive || gameMode !== 'FPS') return;
+        player.yaw = yaw;
+        player.pitch = Math.max(-Math.PI / 2.1, Math.min(Math.PI / 2.1, pitch));
+    },
+    pressKey(action) {
+        const keyMap = {
+            reload: 'KeyR',
+            jump: 'Space',
+            interact: 'KeyF',
+            togglePipboy: 'Tab',
+            toggleCommander: 'KeyM',
+            fireMode: 'KeyV'
+        };
+        const keyCode = keyMap[action];
+        if (!keyCode) return;
+        keys[keyCode] = true;
+        if (keyCode === 'KeyR' && isGameActive) startReload();
+        setTimeout(() => { keys[keyCode] = false; }, 120);
+    },
+    shoot() {
+        if (!isGameActive || gameMode !== 'FPS') return false;
+        return tryShoot();
+    },
+    releaseAllInputs() {
+        Object.keys(keys).forEach(k => { keys[k] = false; });
+        player.isFiring = false;
+        player.isAiming = false;
+    },
+    activateAI() {
+        this._aiActive = true;
+        return true;
+    },
+    deactivateAI() {
+        this._aiActive = false;
+        this.releaseAllInputs();
+        return true;
+    },
+    isAIControlling() {
+        return this._aiActive;
+    },
+    getGameState() {
+        if (!isGameActive) return null;
+        return {
+            position: cameraRig ? { x: cameraRig.position.x, y: cameraRig.position.y, z: cameraRig.position.z } : { x: 0, y: 0, z: 0 },
+            yaw: player.yaw,
+            pitch: player.pitch,
+            health: player.health,
+            ammo: player.ammo,
+            reserveAmmo: player.reserveAmmo,
+            stamina: player.stamina,
+            mode: gameMode,
+            isAiming: player.isAiming,
+            isReloading: player.isReloading
+        };
+    }
+};
+
+// Cross-window API communication (for test interface)
+window.AIPlayerAPI._broadcastStatus = function() {
+    try {
+        localStorage.setItem('omni_api_status', JSON.stringify({
+            available: true,
+            active: this._aiActive,
+            timestamp: Date.now(),
+            gameState: this.getGameState() ? 'active' : 'inactive'
+        }));
+    } catch(e) {
+        console.warn('[API] Could not broadcast status:', e);
+    }
+};
+
+// Process commands from test interface via localStorage
+window.AIPlayerAPI._processCommand = function(cmd) {
+    try {
+        if (!cmd) return;
+        const { action, param } = cmd;
+        
+        switch(action) {
+            case 'activateAI':
+                this.activateAI();
+                break;
+            case 'deactivateAI':
+                this.deactivateAI();
+                break;
+            case 'setInput':
+                if (param && param.action && param.pressed !== undefined) {
+                    this.setInput(param.action, param.pressed);
+                }
+                break;
+            case 'pressKey':
+                if (param && param.action) {
+                    this.pressKey(param.action);
+                }
+                break;
+            case 'shoot':
+                this.shoot();
+                break;
+        }
+        
+        // Broadcast updated status
+        this._broadcastStatus();
+    } catch(e) {
+        console.warn('[API] Command processing error:', e);
+    }
+};
+
+// Listen for commands from test interface
+window.addEventListener('storage', (e) => {
+    if (e.key === 'omni_api_command' && window.AIPlayerAPI) {
+        try {
+            const cmd = JSON.parse(e.newValue);
+            window.AIPlayerAPI._processCommand(cmd);
+            localStorage.removeItem('omni_api_command');
+        } catch(err) {
+            console.warn('[API] Command parse error:', err);
+        }
+    }
+});
+
+// ===== CRITICAL: EXPOSE FUNCTIONS TO GLOBAL SCOPE =====
+window.launchGame = launchGame;
+window.initGame = initGame;
+window.handleInteraction = handleInteraction;
+
+// Broadcast status every 500ms (simple version)
+setInterval(() => {
+    try {
+        if (window.AIPlayerAPI) {
+            localStorage.setItem('omni_api_status', JSON.stringify({
+                available: true,
+                active: window.AIPlayerAPI._aiActive,
+                timestamp: Date.now()
+            }));
+        }
+    } catch(e) {
+        // Silently fail if localStorage unavailable
+    }
+}, 500);
+
+console.log('[Core Game] v11 loaded successfully');
+
+})(); // CLOSE THE IIFE - CRITICAL!

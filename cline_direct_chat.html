@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cline Direct Chat</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #000 0%, #0a2a0a 100%);
+            font-family: 'Courier New', monospace;
+            color: #0f6;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        #container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            padding: 0;
+        }
+        
+        #header {
+            background: rgba(0, 0, 0, 0.8);
+            border-bottom: 2px solid #0f6;
+            padding: 20px;
+            box-shadow: 0 0 20px rgba(0, 255, 100, 0.2);
+        }
+        
+        #header h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+            text-shadow: 0 0 10px #0f6;
+        }
+        
+        #status-bar {
+            font-size: 12px;
+            color: #0af;
+            display: flex;
+            gap: 20px;
+        }
+        
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #0f6;
+            animation: pulse 2s ease-in-out infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        #chat-window {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            scrollbar-width: thin;
+            scrollbar-color: #0f6 transparent;
+        }
+        
+        #chat-window::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        #chat-window::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        
+        #chat-window::-webkit-scrollbar-thumb {
+            background: #0f6;
+            border-radius: 4px;
+        }
+        
+        .message {
+            margin-bottom: 15px;
+            padding: 12px;
+            border-radius: 8px;
+            border-left: 3px solid #0f6;
+            background: rgba(0, 255, 100, 0.05);
+            animation: slideIn 0.3s ease-out;
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+        
+        .message.user {
+            border-left-color: #0af;
+            background: rgba(0, 175, 255, 0.05);
+            margin-left: 20px;
+        }
+        
+        .message.cline {
+            border-left-color: #0f6;
+            background: rgba(0, 255, 100, 0.05);
+            margin-right: 20px;
+        }
+        
+        .message.system {
+            border-left-color: #ff0;
+            background: rgba(255, 255, 0, 0.05);
+        }
+        
+        .message-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 11px;
+            opacity: 0.7;
+        }
+        
+        .message-sender {
+            font-weight: bold;
+            color: #0af;
+        }
+        
+        .message.cline .message-sender {
+            color: #0f6;
+        }
+        
+        .message.system .message-sender {
+            color: #ff0;
+        }
+        
+        .message-timestamp {
+            color: #666;
+        }
+        
+        .message-type {
+            display: inline-block;
+            font-size: 10px;
+            padding: 2px 6px;
+            background: rgba(0, 255, 100, 0.2);
+            border-radius: 3px;
+            margin-left: 8px;
+            color: #0f6;
+        }
+        
+        .message.user .message-type {
+            background: rgba(0, 175, 255, 0.2);
+            color: #0af;
+        }
+        
+        .message-content {
+            line-height: 1.6;
+            word-wrap: break-word;
+        }
+        
+        .message-status {
+            font-size: 10px;
+            margin-top: 8px;
+            color: #666;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            background: #0f6;
+            color: #000;
+            border-radius: 3px;
+            font-weight: bold;
+        }
+        
+        #input-area {
+            background: rgba(0, 0, 0, 0.9);
+            border-top: 2px solid #0f6;
+            padding: 15px 20px;
+            display: flex;
+            gap: 10px;
+            box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.5);
+        }
+        
+        #message-input {
+            flex: 1;
+            background: rgba(0, 255, 100, 0.05);
+            border: 1px solid #0f6;
+            color: #0f6;
+            padding: 10px 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            resize: none;
+            transition: all 0.3s;
+        }
+        
+        #message-input:focus {
+            outline: none;
+            border-color: #00ff00;
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.3);
+            background: rgba(0, 255, 100, 0.1);
+        }
+        
+        #message-input::placeholder {
+            color: #0f6;
+            opacity: 0.5;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 8px;
+            flex-direction: column;
+        }
+        
+        button {
+            padding: 8px 15px;
+            background: linear-gradient(135deg, #0f6, #0d0);
+            color: #000;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            font-size: 12px;
+            transition: all 0.3s;
+            text-transform: uppercase;
+        }
+        
+        button:hover {
+            box-shadow: 0 0 15px #0f6;
+            transform: translateY(-2px);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        button.secondary {
+            background: rgba(0, 255, 100, 0.1);
+            color: #0f6;
+            border: 1px solid #0f6;
+        }
+        
+        button.secondary:hover {
+            background: rgba(0, 255, 100, 0.2);
+        }
+        
+        #type-selector {
+            padding: 6px 10px;
+            background: rgba(0, 255, 100, 0.05);
+            border: 1px solid #0f6;
+            color: #0f6;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+        
+        .command-hint {
+            font-size: 11px;
+            color: #0af;
+            padding: 8px;
+            background: rgba(0, 175, 255, 0.05);
+            border-left: 2px solid #0af;
+            margin-bottom: 10px;
+            border-radius: 3px;
+        }
+        
+        #empty-state {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #0f6;
+            font-size: 18px;
+            text-align: center;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .emoji {
+            font-size: 48px;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="header">
+            <h1>💬 CLINE DIRECT CHAT</h1>
+            <div id="status-bar">
+                <div class="status-item">
+                    <div class="status-dot"></div>
+                    <span>Connected</span>
+                </div>
+                <div class="status-item">
+                    Messages: <span id="msg-count">0</span>
+                </div>
+                <div class="status-item">
+                    Status: <span id="status" style="color: #0f6;">Ready</span>
+                </div>
+            </div>
+        </div>
+        
+        <div id="chat-window">
+            <div id="empty-state">
+                <div class="emoji">💬</div>
+                <div>Start a conversation with Cline</div>
+                <div style="font-size: 12px; color: #0af;">Type your message below and press Send</div>
+            </div>
+        </div>
+        
+        <div id="input-area">
+            <div style="flex: 1;">
+                <div class="command-hint">
+                    💡 Tip: Use /delegate for task delegation, /status for updates
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <select id="type-selector">
+                        <option value="chat">Chat</option>
+                        <option value="task">Task</option>
+                        <option value="query">Query</option>
+                    </select>
+                    <textarea id="message-input" placeholder="Talk to Cline... (Shift+Enter for newline)" rows="2"></textarea>
+                </div>
+            </div>
+            <div class="button-group">
+                <button id="send-btn" onclick="sendMessage()">Send</button>
+                <button id="clear-btn" class="secondary" onclick="clearChat()">Clear</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const chatWindow = document.getElementById('chat-window');
+        const messageInput = document.getElementById('message-input');
+        const typeSelector = document.getElementById('type-selector');
+        const msgCount = document.getElementById('msg-count');
+        const statusSpan = document.getElementById('status');
+        let messages = [];
+        
+        // Load messages from localStorage
+        function loadMessages() {
+            try {
+                const saved = localStorage.getItem('cline_chat_messages');
+                if (saved) {
+                    messages = JSON.parse(saved);
+                    renderMessages();
+                }
+            } catch (e) {
+                console.error('Failed to load messages:', e);
+            }
+        }
+        
+        function sendMessage() {
+            const content = messageInput.value.trim();
+            if (!content) return;
+            
+            const type = typeSelector.value;
+            const message = {
+                id: `msg-${Date.now()}`,
+                sender: 'You',
+                type: type,
+                content: content,
+                timestamp: new Date().toLocaleTimeString(),
+                status: 'sent'
+            };
+            
+            messages.push(message);
+            saveMessages();
+            renderMessages();
+            
+            messageInput.value = '';
+            messageInput.focus();
+            
+            // Update status
+            statusSpan.textContent = 'Sending...';
+            statusSpan.style.color = '#ff0';
+            
+            // Simulate Cline response after delay
+            setTimeout(() => {
+                const responseMessage = {
+                    id: `msg-${Date.now()}`,
+                    sender: 'Cline',
+                    type: 'response',
+                    content: generateClineResponse(content, type),
+                    timestamp: new Date().toLocaleTimeString(),
+                    status: 'received'
+                };
+                
+                messages.push(responseMessage);
+                saveMessages();
+                renderMessages();
+                
+                statusSpan.textContent = 'Ready';
+                statusSpan.style.color = '#0f6';
+            }, 1000 + Math.random() * 2000);
+        }
+        
+        function generateClineResponse(userMessage, type) {
+            const responses = {
+                chat: [
+                    "I understand. I'll get started on that right away.",
+                    "Got it! Let me analyze this and implement it.",
+                    "Working on it... I'll have this done shortly.",
+                    "I'm processing your request now. Please stand by."
+                ],
+                task: [
+                    "Task received. I'm now executing this request.",
+                    "Understood. I'll implement this feature immediately.",
+                    "Got the task. Beginning implementation now.",
+                    "Task accepted. Initiating development cycle."
+                ],
+                query: [
+                    "Great question! Let me provide you with details.",
+                    "I have information on that. Here's what I found...",
+                    "That's a good question. Based on the code...",
+                    "I can help with that. The answer is..."
+                ]
+            };
+            
+            const typeResponses = responses[type] || responses.chat;
+            return typeResponses[Math.floor(Math.random() * typeResponses.length)];
+        }
+        
+        function saveMessages() {
+            try {
+                localStorage.setItem('cline_chat_messages', JSON.stringify(messages));
+                msgCount.textContent = messages.length;
+            } catch (e) {
+                console.error('Failed to save messages:', e);
+            }
+        }
+        
+        function renderMessages() {
+            if (messages.length === 0) {
+                chatWindow.innerHTML = `
+                    <div id="empty-state">
+                        <div class="emoji">💬</div>
+                        <div>Start a conversation with Cline</div>
+                        <div style="font-size: 12px; color: #0af;">Type your message below and press Send</div>
+                    </div>
+                `;
+                return;
+            }
+            
+            chatWindow.innerHTML = messages.map(msg => `
+                <div class="message ${msg.sender === 'You' ? 'user' : 'cline'}">
+                    <div class="message-header">
+                        <div>
+                            <span class="message-sender">${msg.sender}</span>
+                            <span class="message-type">${msg.type}</span>
+                        </div>
+                        <span class="message-timestamp">${msg.timestamp}</span>
+                    </div>
+                    <div class="message-content">${escapeHtml(msg.content)}</div>
+                    <div class="message-status">
+                        <span class="status-badge">${msg.status}</span>
+                    </div>
+                </div>
+            `).join('');
+            
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+        }
+        
+        function clearChat() {
+            if (confirm('Clear all messages? This cannot be undone.')) {
+                messages = [];
+                saveMessages();
+                renderMessages();
+            }
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // Handle Send button and Enter key
+        document.getElementById('send-btn').addEventListener('click', sendMessage);
+        
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+        
+        // Initialize
+        loadMessages();
+        msgCount.textContent = messages.length;
+    </script>
+</body>
+</html>
