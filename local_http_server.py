@@ -135,29 +135,229 @@ if (!window.healthBarUI) {{
     elif 'wall' in task_lower and ('run' in task_lower or 'jump' in task_lower):
         feature_type = "Wall Running"
         feature_code = f"""
-// AUTO-FEATURE [{feature_id}]: Wall Running System  
+// AUTO-FEATURE [{feature_id}]: Wall Running System
 if (!window.wallRunSystem) {{
     window.wallRunSystem = {{
         active: false,
-        timer: 0,
-        init() {{ console.log('[Wall Run] Ready'); }},
-        check() {{ /* Wall detection code */ }},
-        update(dt) {{ /* Wall run physics */ }}
+        wallSide: null,
+        wallNormal: null,
+        wallRunSpeed: 8,
+        wallRunGravity: 5,
+        maxWallRunTime: 3,
+        wallRunTimer: 0,
+        
+        init() {{
+            console.log('[Wall Run] System initialized');
+        }},
+        
+        checkWall() {{
+            if (!window.player || !window.objects) return null;
+            
+            const rayDirections = [
+                new THREE.Vector3(1, 0, 0),   // Right
+                new THREE.Vector3(-1, 0, 0),  // Left
+                new THREE.Vector3(0, 0, 1),   // Forward
+                new THREE.Vector3(0, 0, -1)   // Back
+            ];
+            
+            const raycaster = new THREE.Raycaster();
+            const playerPos = window.camera ? window.camera.position.clone() : new THREE.Vector3();
+            
+            for (let i = 0; i < rayDirections.length; i++) {{
+                const dir = rayDirections[i].clone();
+                if (window.camera) {{
+                    dir.applyQuaternion(window.camera.quaternion);
+                }}
+                dir.y = 0;
+                dir.normalize();
+                
+                raycaster.set(playerPos, dir);
+                const intersects = raycaster.intersectObjects(window.objects || []);
+                
+                if (intersects.length > 0 && intersects[0].distance < 1.5) {{
+                    return {{
+                        side: i === 0 ? 'right' : i === 1 ? 'left' : i === 2 ? 'forward' : 'back',
+                        normal: intersects[0].face.normal.clone(),
+                        distance: intersects[0].distance
+                    }};
+                }}
+            }}
+            return null;
+        }},
+        
+        start(wallData) {{
+            this.active = true;
+            this.wallSide = wallData.side;
+            this.wallNormal = wallData.normal;
+            this.wallRunTimer = this.maxWallRunTime;
+            
+            if (window.player) {{
+                window.player.velocity.y = 2;
+            }}
+            
+            console.log('[Wall Run] Started on', wallData.side, 'wall');
+        }},
+        
+        stop() {{
+            if (!this.active) return;
+            this.active = false;
+            this.wallSide = null;
+            this.wallNormal = null;
+            console.log('[Wall Run] Stopped');
+        }},
+        
+        update(deltaTime) {{
+            if (!this.active || !window.player) return;
+            
+            this.wallRunTimer -= deltaTime;
+            if (this.wallRunTimer <= 0) {{
+                this.stop();
+                return;
+            }}
+            
+            const wallCheck = this.checkWall();
+            if (!wallCheck) {{
+                this.stop();
+                return;
+            }}
+            
+            // Apply wall run physics
+            if (window.player.velocity) {{
+                window.player.velocity.y = Math.max(
+                    window.player.velocity.y - this.wallRunGravity * deltaTime,
+                    -5
+                );
+                
+                const wallDir = new THREE.Vector3(-this.wallNormal.z, 0, this.wallNormal.x);
+                if (this.wallSide === 'right') wallDir.multiplyScalar(-1);
+                
+                if (window.camera) {{
+                    const forward = new THREE.Vector3(0, 0, -1);
+                    forward.applyQuaternion(window.camera.quaternion);
+                    forward.y = 0;
+                    forward.normalize();
+                    
+                    const movement = forward.clone().multiplyScalar(this.wallRunSpeed * deltaTime);
+                    window.player.velocity.x = movement.x;
+                    window.player.velocity.z = movement.z;
+                }}
+            }}
+        }}
     }};
+    
     window.wallRunSystem.init();
+    
+    // Add keybinds and update loop
+    let lastSpacePress = 0;
+    document.addEventListener('keydown', (e) => {{
+        if (e.code === 'Space' && !window.wallRunSystem.active) {{
+            const now = Date.now();
+            const wallData = window.wallRunSystem.checkWall();
+            if (wallData && now - lastSpacePress < 300) {{
+                window.wallRunSystem.start(wallData);
+            }}
+            lastSpacePress = now;
+        }}
+    }});
+    
+    console.log('[Wall Run] Ready - Double-tap SPACE near walls!');
 }}"""
-    elif 'powerup' in task_lower or 'boost' in task_lower:
+    elif 'powerup' in task_lower or 'boost' in task_lower or 'pickup' in task_lower:
         feature_type = "Powerup System"
         feature_code = f"""
 // AUTO-FEATURE [{feature_id}]: Powerup System
 if (!window.powerupSystem) {{
     window.powerupSystem = {{
         items: [],
-        spawn(pos, type) {{ console.log('[Powerup] Spawned', type); }},
-        update(dt) {{ /* Powerup logic */ }}
+        
+        spawn(position, type = 'speed') {{
+            const geometry = new THREE.SphereGeometry(0.5, 16, 16);
+            const color = type === 'speed' ? 0x00ffff : type === 'health' ? 0x00ff00 : 0xffff00;
+            const material = new THREE.MeshBasicMaterial({{
+                color: color,
+                emissive: color,
+                emissiveIntensity: 0.5
+            }});
+            
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.position.copy(position);
+            mesh.userData = {{ type, spinSpeed: 2, bobSpeed: 2 }};
+            
+            if (window.scene) {{
+                window.scene.add(mesh);
+                this.items.push(mesh);
+                console.log('[Powerup] Spawned', type, 'at', position);
+            }}
+        }},
+        
+        collect(type) {{
+            console.log('[Powerup] Collected:', type);
+            
+            if (type === 'health' && window.player) {{
+                window.player.health = Math.min(
+                    (window.player.health || 100) + 25,
+                    window.player.maxHealth || 100
+                );
+                console.log('[Powerup] Health restored to', window.player.health);
+            }} else if (type === 'speed' && window.SETTINGS) {{
+                const originalSpeed = window.SETTINGS.MAX_SPRINT;
+                window.SETTINGS.MAX_SPRINT *= 1.5;
+                console.log('[Powerup] Speed boost activated!');
+                
+                setTimeout(() => {{
+                    window.SETTINGS.MAX_SPRINT = originalSpeed;
+                    console.log('[Powerup] Speed boost expired');
+                }}, 10000);
+            }} else if (type === 'jump' && window.SETTINGS) {{
+                const originalJump = window.SETTINGS.JUMP_POWER;
+                window.SETTINGS.JUMP_POWER *= 1.5;
+                console.log('[Powerup] Jump boost activated!');
+                
+                setTimeout(() => {{
+                    window.SETTINGS.JUMP_POWER = originalJump;
+                    console.log('[Powerup] Jump boost expired');
+                }}, 10000);
+            }}
+        }},
+        
+        update(deltaTime) {{
+            if (!window.camera) return;
+            const playerPos = window.camera.position;
+            
+            for (let i = this.items.length - 1; i >= 0; i--) {{
+                const item = this.items[i];
+                
+                // Spin animation
+                item.rotation.y += item.userData.spinSpeed * deltaTime;
+                
+                // Bob animation
+                const bobAmount = Math.sin(Date.now() * 0.002 * item.userData.bobSpeed) * 0.3;
+                item.position.y += bobAmount * deltaTime;
+                
+                // Check collection
+                const distance = playerPos.distanceTo(item.position);
+                if (distance < 1.5) {{
+                    this.collect(item.userData.type);
+                    if (window.scene) {{
+                        window.scene.remove(item);
+                    }}
+                    this.items.splice(i, 1);
+                }}
+            }}
+        }}
     }};
-    window.powerupSystem.init = () => console.log('[Powerups] Ready');
-    window.powerupSystem.init();
+    
+    // Spawn some test powerups
+    setTimeout(() => {{
+        if (window.powerupSystem && window.scene) {{
+            window.powerupSystem.spawn(new THREE.Vector3(10, 1, 10), 'speed');
+            window.powerupSystem.spawn(new THREE.Vector3(-10, 1, -10), 'health');
+            window.powerupSystem.spawn(new THREE.Vector3(0, 1, 15), 'jump');
+            console.log('[Powerup] Test powerups spawned!');
+        }}
+    }}, 2000);
+    
+    console.log('[Powerup] System initialized');
 }}"""
     else:
         feature_type = "Generic Feature"

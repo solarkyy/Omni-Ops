@@ -3073,4 +3073,186 @@ setInterval(() => {
 
 console.log('[Core Game] v11 loaded successfully');
 
+// AUTO-FEATURE [health_bar_bottom_of]: Health Bar System
+if (!window.healthBarUI) {
+    window.healthBarUI = {
+        element: null,
+        init() {
+            if (this.element) return; // Prevent duplicates
+            const bar = document.createElement('div');
+            bar.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);width:300px;height:40px;background:#222;border:2px solid #0f0;border-radius:5px;overflow:hidden;z-index:9000;';
+            const fill = document.createElement('div');
+            fill.id = 'health-bar-fill';
+            fill.style.cssText = 'height:100%;background:linear-gradient(90deg,#f00,#ff0,#0f0);transition:width 0.3s;width:100%';
+            const text = document.createElement('div');
+            text.id = 'health-text';
+            text.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#fff;font:bold 14px monospace;z-index:1;text-shadow:0 0 3px #000';
+            text.textContent = '100 / 100';
+            bar.appendChild(fill);
+            bar.appendChild(text);
+            document.body.appendChild(bar);
+            this.element = bar;
+            console.log('[Health Bar] Initialized at bottom of screen');
+        },
+        update(current, max) {
+            const fill = document.getElementById('health-bar-fill');
+            const text = document.getElementById('health-text');
+            if (fill && text) {
+                const percent = (current / max) * 100;
+                fill.style.width = percent + '%';
+                text.textContent = Math.floor(current) + ' / ' + max;
+            }
+        }
+    };
+    setTimeout(() => window.healthBarUI.init(), 500);
+    setInterval(() => {
+        if (window.player) window.healthBarUI.update(player.health || 100, player.maxHealth || 100);
+    }, 100);
+}
+
+
+// AUTO-FEATURE [implement_wall_runni]: Wall Running System
+if (!window.wallRunSystem) {
+    window.wallRunSystem = {
+        active: false,
+        wallSide: null,
+        wallNormal: null,
+        wallRunSpeed: 8,
+        wallRunGravity: 5,
+        maxWallRunTime: 3,
+        wallRunTimer: 0,
+        
+        init() {
+            console.log('[Wall Run] System initialized');
+        },
+        
+        checkWall() {
+            if (!window.player || !window.objects) return null;
+            
+            const rayDirections = [
+                new THREE.Vector3(1, 0, 0),   // Right
+                new THREE.Vector3(-1, 0, 0),  // Left
+                new THREE.Vector3(0, 0, 1),   // Forward
+                new THREE.Vector3(0, 0, -1)   // Back
+            ];
+            
+            const raycaster = new THREE.Raycaster();
+            const playerPos = window.camera ? window.camera.position.clone() : new THREE.Vector3();
+            
+            for (let i = 0; i < rayDirections.length; i++) {
+                const dir = rayDirections[i].clone();
+                if (window.camera) {
+                    dir.applyQuaternion(window.camera.quaternion);
+                }
+                dir.y = 0;
+                dir.normalize();
+                
+                raycaster.set(playerPos, dir);
+                const intersects = raycaster.intersectObjects(window.objects || []);
+                
+                if (intersects.length > 0 && intersects[0].distance < 1.5) {
+                    return {
+                        side: i === 0 ? 'right' : i === 1 ? 'left' : i === 2 ? 'forward' : 'back',
+                        normal: intersects[0].face.normal.clone(),
+                        distance: intersects[0].distance
+                    };
+                }
+            }
+            return null;
+        },
+        
+        start(wallData) {
+            this.active = true;
+            this.wallSide = wallData.side;
+            this.wallNormal = wallData.normal;
+            this.wallRunTimer = this.maxWallRunTime;
+            
+            if (window.player) {
+                window.player.velocity.y = 2;
+            }
+            
+            console.log('[Wall Run] Started on', wallData.side, 'wall');
+        },
+        
+        stop() {
+            if (!this.active) return;
+            this.active = false;
+            this.wallSide = null;
+            this.wallNormal = null;
+            console.log('[Wall Run] Stopped');
+        },
+        
+        update(deltaTime) {
+            if (!this.active || !window.player) return;
+            
+            this.wallRunTimer -= deltaTime;
+            if (this.wallRunTimer <= 0) {
+                this.stop();
+                return;
+            }
+            
+            const wallCheck = this.checkWall();
+            if (!wallCheck) {
+                this.stop();
+                return;
+            }
+            
+            // Apply wall run physics
+            if (window.player.velocity) {
+                window.player.velocity.y = Math.max(
+                    window.player.velocity.y - this.wallRunGravity * deltaTime,
+                    -5
+                );
+                
+                const wallDir = new THREE.Vector3(-this.wallNormal.z, 0, this.wallNormal.x);
+                if (this.wallSide === 'right') wallDir.multiplyScalar(-1);
+                
+                if (window.camera) {
+                    const forward = new THREE.Vector3(0, 0, -1);
+                    forward.applyQuaternion(window.camera.quaternion);
+                    forward.y = 0;
+                    forward.normalize();
+                    
+                    const movement = forward.clone().multiplyScalar(this.wallRunSpeed * deltaTime);
+                    window.player.velocity.x = movement.x;
+                    window.player.velocity.z = movement.z;
+                }
+            }
+        }
+    };
+    
+    window.wallRunSystem.init();
+    
+    // Add keybinds and update loop
+    let lastSpacePress = 0;
+    document.addEventListener('keydown', (e) => {
+        if (e.code === 'Space' && !window.wallRunSystem.active) {
+            const now = Date.now();
+            const wallData = window.wallRunSystem.checkWall();
+            if (wallData && now - lastSpacePress < 300) {
+                window.wallRunSystem.start(wallData);
+            }
+            lastSpacePress = now;
+        }
+    });
+    
+    console.log('[Wall Run] Ready - Double-tap SPACE near walls!');
+}
+
+// Ensure wall running is updated in game loop
+if (!window.wallRunUpdateHooked) {
+    window.wallRunUpdateHooked = true;
+    const originalAnimateFunc = window.animateFrame;
+    window.animateFrame = function() {
+        if (originalAnimateFunc) {
+            originalAnimateFunc.call(this);
+        }
+        if (window.wallRunSystem && window.wallRunSystem.active) {
+            window.wallRunSystem.update(1/60); // Assume 60 FPS
+        }
+    };
+}
+
+
+
 })(); // CLOSE THE IIFE - CRITICAL!
