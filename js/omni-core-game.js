@@ -37,7 +37,9 @@ const SETTINGS = {
     HIFI: true, PLAYER_RADIUS: 0.5, COMMANDER_SPEED: 40,
     INTERACT_DIST: 5.0, TILE_SIZE: 12, WORLD_TILES: 50,
     TIME_SCALE: 0.02, 
-    BODY_DECAY_TIME: 1200000 
+    BODY_DECAY_TIME: 1200000,
+    MAX_DELTA: 0.05,
+    PHYSICS_STEPS: 10
 };
 // --- CENTRALIZED GAME STATE ---
 const gameState = {
@@ -46,7 +48,8 @@ const gameState = {
     timeOfDay: 12.0, 
     isInDialogue: false,
     isPipboyOpen: false,
-    isInventoryOpen: false
+    isInventoryOpen: false,
+    isPaused: false
 };
 
 // --- WEAPON POSITIONING (Iron Sights / ADS) ---
@@ -181,6 +184,9 @@ function onResize() {
 function initGame() {
     console.log('[initGame] Starting...');
     try {
+        if (!isGameActive) {
+            isGameActive = true;
+        }
         const existingCanvas = document.querySelector('canvas');
         if (existingCanvas && existingCanvas.id !== 'minimap-canvas') existingCanvas.parentNode.removeChild(existingCanvas);
         
@@ -293,41 +299,15 @@ function initGame() {
         setupLighting();
         window.sunLight = sunLight;
         
-        if (window.OMNI_OPS_STORY_MODE === 'CHAPTER1') {
-            console.log('[initGame] Chapter 1 mode active - skipping sandbox ground/test objects');
+        console.log('[initGame] Chapter 1 initialization...');
+        if (typeof window.initializeChapter1Story === 'function') {
+            window.initializeChapter1Story();
         } else {
-            console.log('[initGame] Creating ground plane...');
-            const grassMat = new THREE.MeshStandardMaterial({ color: 0x223311 });
-            groundPlane = new THREE.Mesh(new THREE.PlaneGeometry(2000, 2000), grassMat);
-            groundPlane.rotation.x = -Math.PI / 2; 
-            groundPlane.receiveShadow = true; 
-            groundPlane.userData = { ue5: true, type: 'terrain', editorPlaceable: true }; // Mark for editor raycasting
-            scene.add(groundPlane);
-            
-            // TEST CUBE - Should be clearly visible
-            console.log('[initGame] Adding test cube for visibility check...');
-            const testCube = new THREE.Mesh(
-                new THREE.BoxGeometry(5, 5, 5),
-                new THREE.MeshStandardMaterial({ color: 0xff0000, emissive: 0xff0000, emissiveIntensity: 0.5 })
-            );
-            testCube.position.set(0, 2.5, 20);
-            scene.add(testCube);
-            console.log('[initGame] Test cube added at position:', testCube.position);
-        }
-        
-        if (window.OMNI_OPS_STORY_MODE === 'CHAPTER1') {
-            console.log('[initGame] Chapter 1 mode active - skipping sandbox world generation');
-        } else {
-            console.log('[initGame] Generating world...');
-            // Use Centralized Seed
-            generateWorld(gameState.worldSeed);
+            console.error('[initGame] Chapter 1 initializer missing', { hasInit: typeof window.initializeChapter1Story });
         }
         
         console.log('[initGame] Setting up weapon...');
         setupWeapon();
-        
-        console.log('[initGame] Spawning AI units...');
-        try { spawnAIUnits(); } catch(e) { console.error('[initGame] Error spawning AI:', e); }
         
         console.log('[initGame] Initializing living world...');
         if (window.OMNI_OPS_STORY_MODE === 'CHAPTER1') {
@@ -365,7 +345,11 @@ function initGame() {
         });
         
         console.log('[initGame] Animation loop starting');
-        animate();
+        if (typeof window.animate === 'function') {
+            window.animate();
+        } else {
+            console.error('[CoreGame::initGame] Animation loop missing', { hasAnimate: typeof window.animate });
+        }
         
     } catch(err) {
         console.error('[initGame] FATAL ERROR:', err);
@@ -452,6 +436,7 @@ function launchGame() {
         initGame();
         console.log('[launchGame] Setting isGameActive = true');
         isGameActive = true;
+        gameState.isPaused = false;
         
         // ✅ GLOBAL ACTIVATION FLAG - Critical for Chapter 1 integration
         window.isGameActive = true;
@@ -2919,7 +2904,7 @@ function animate() {
         return;
     }
     
-    const delta = Math.min(clock.getDelta(), 0.05);
+    const delta = Math.min(clock.getDelta(), SETTINGS.MAX_DELTA);
     
     // Update weapon animation mixer
     if (window.gunMixer) {
@@ -2934,9 +2919,9 @@ function animate() {
     }
     
     // ✅ Task 3: Titanium Physics - Sub-stepped collision detection (10x per frame)
-    const PHYSICS_STEPS = 10; // Check collisions 10x per frame for precision
-    for (let i = 0; i < PHYSICS_STEPS; i++) {
-        updatePhysics(delta / PHYSICS_STEPS);
+    const physicsSteps = SETTINGS.PHYSICS_STEPS;
+    for (let i = 0; i < physicsSteps; i++) {
+        updatePhysics(delta / physicsSteps);
     }
     
     // ✅ Safety Net: Prevent player from falling into the void
@@ -3180,6 +3165,8 @@ function animate() {
     renderer.clearDepth();
     renderer.render(scene, activeCamera);
 }
+
+window.animate = animate;
 
 document.addEventListener('pointerlockchange', () => {
     if (switchingModes || gameState.isInDialogue || gameState.isPipboyOpen) return; 

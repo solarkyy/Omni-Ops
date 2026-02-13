@@ -360,12 +360,13 @@ Player clicks "Play" or game auto-starts (after UI initialization complete)
 
 | Event | Action | Responsibility | Signal Emitted |
 |-------|--------|-----------------|-----------------|
-| 1 | Player spawned | Physics engine | `SignalBus.emit('player:spawned')` |
-| 2 | UI binds to signals | Specter Command HUD | UI subscribed to all signals |
-| 3 | Game loop starts | Three.js render loop (60 FPS) | 16.67ms per frame |
-| 4 | Physics sub-step loop | Fixed timestep (10 steps) | Deterministic collisions |
-| 5 | AI polling active | AgentBridge monitoring readiness | Can accept commands |
-| 6 | Test Harness ready | Behavioral test framework | Can run automated tests |
+| 1 | Chapter 1 scene initialization (no sandbox generation) | `initGame()` | `initializeChapter1Story()` |
+| 2 | Player spawned | Physics engine | `SignalBus.emit('player:spawned')` |
+| 3 | UI binds to signals | Specter Command HUD | UI subscribed to all signals |
+| 4 | Game loop starts | Three.js render loop (60 FPS) | 16.67ms per frame |
+| 5 | Physics sub-step loop | Fixed timestep (10 steps) | Deterministic collisions |
+| 6 | AI polling active | AgentBridge monitoring readiness | Can accept commands |
+| 7 | Test Harness ready | Behavioral test framework | Can run automated tests |
 
 **Steady-State Data Flow (Every Frame):**
 
