@@ -1,0 +1,339 @@
+{
+  "_meta": {
+    "name": "OMNI-OPS GLOBAL CONFIGURATION REGISTRY",
+    "version": "1.0.0",
+    "purpose": "Single source of truth for all hardcoded values. This is Tier 2: The Registry.",
+    "last_updated": "2026-02-13T00:00:00Z",
+    "authority": "Chief Systems Architect",
+    "note": "All code files MUST reference these values. Zero magic numbers allowed."
+  },
+  "system": {
+    "name": "Omni-Ops",
+    "version": "1.0.0",
+    "description": "Production-grade tactical FPS/RTS hybrid",
+    "environment": "production",
+    "build_system": "Node.js + Electron",
+    "renderer": "Three.js v0.160+",
+    "runtime": "Electron with Node integration"
+  },
+  "ports": {
+    "_note": "All network services use 127.0.0.1 (NOT localhost). Windows DNS lag fix.",
+    "ai_brain_server": 8080,
+    "ai_vision_server": 8081,
+    "http_dev_server": 8000,
+    "network_host": "127.0.0.1"
+  },
+  "physics": {
+    "_note": "Titanium Octree + Fixed Sub-Stepping. SEE: .github/copilot-instructions.md III.A",
+    "engine": "Custom Titanium Octree",
+    "gravity": -9.81,
+    "sub_steps": 10,
+    "max_delta_ms": 50,
+    "physics_budget_ms": 4.0,
+    "collision_broadphase": "Octree",
+    "collision_narrowphase": "SAT",
+    "octree_hierarchy_enabled": true,
+    "vector_reuse_required": true,
+    "typed_array_required": true,
+    "memory_rule": "Zero allocation inside update() - use Object Pools"
+  },
+  "ai_context": {
+    "_note": "Context loading for LLM integration. Fetched from 127.0.0.1:8080",
+    "enabled": true,
+    "base_url": "http://127.0.0.1:8080/ai_context",
+    "refresh_interval_ms": 300000,
+    "max_chars_per_file": 4000,
+    "context_load_timeout_ms": 30000,
+    "files": [
+      "README.md",
+      "Ai Context.txt",
+      "AI Vision and systems.txt",
+      "Omni-Ops – Self-Improving AI Developer Loop.txt",
+      "coding_standards.md",
+      "common_patterns.md",
+      "advanced_patterns.md",
+      "ai_behaviors.md",
+      "game_architecture.md",
+      "error_recovery.md"
+    ]
+  },
+  "agent_bridge": {
+    "_note": "Command routing & context validation. SEE: ai/AgentBridge.js",
+    "enabled": true,
+    "dev_mode": true,
+    "test_mode": false,
+    "max_output_entries": 8,
+    "context_warning_throttle_ms": 5000,
+    "force_ready_override_available": true,
+    "architecture": "Pub/Sub via SignalBus - NO direct DOM access from Physics"
+  },
+  "behavior_patches": {
+    "_note": "AI Behavior approval pipeline. SEE: ai/BehaviorPatchManager.js",
+    "max_pending": 20,
+    "max_code_length": 10000,
+    "min_code_length": 10,
+    "max_summary_length": 500,
+    "dev_mode": true,
+    "storage_type": "in-memory (resets on reload)"
+  },
+  "network": {
+    "_note": "All timeouts + fallback rules. NO localhost. NO opentelemetry.",
+    "ai_server_url": "http://127.0.0.1:8080",
+    "ai_context_url": "http://127.0.0.1:8080/ai_context",
+    "vision_server_url": "http://127.0.0.1:8081",
+    "timeout_ms": 3000,
+    "vision_frame_capture_ms": 500,
+    "retry_attempts": 3,
+    "fallback_mode": "Enabled - Game continues if AI server unreachable",
+    "dns_fix": "Use 127.0.0.1 instead of localhost on Windows"
+  },
+  "ui": {
+    "_note": "Specter Command diegetic HUD + SignalBus decoupling. PHASE 3.5: UI Initialization",
+    "hud_type": "diegetic_specter_command",
+    "dom_batch_interval_ms": 100,
+    "ui_update_hz": 10,
+    "signal_bus_enabled": true,
+    "null_guard_required": true,
+    "memory_rule": "No DOM writes inside game loop - batch via requestAnimationFrame",
+    "ui_boot_timeout_ms": 5000,
+    "ui_boot_note": "Maximum time to wait for window.initializeUI() to complete and emit ui:system_ready signal. If exceeded, ModuleLoader proceeds with fallback."
+  },
+  "test_harness": {
+    "_note": "Automated behavioral test framework. NO dependency on DOM/network",
+    "type": "Browser-based JavaScript",
+    "isolation": "Independent of core game logic",
+    "metrics_enabled": true,
+    "performance_tracking_enabled": true,
+    "debug_flag": "DEBUG (performance.mark/measure)"
+  },
+  "ai_worker_contract": {
+    "_note": "Copilot / External AI integration specification",
+    "enabled": true,
+    "interface_type": "Browser Console (window.AgentBridge, window.IntelligentAgent)",
+    "primary_entry": "window.AgentBridge.enqueueCommand()",
+    "snapshot_export": "window.AgentBridge.exportSnapshot()",
+    "state_readiness": "window.AgentBridge.isReady()"
+  },
+  "intelligent_agent": {
+    "_note": "Constants for IntelligentAgent.js decision loop. REF: ai/IntelligentAgent.js lines 10-14",
+    "default_thought_limit": 10,
+    "sector_size": 100,
+    "safe_zone_radius": 30,
+    "mode_update_interval_ms": 5000,
+    "look_max_step": 0.12,
+    "look_max_pitch_step": 0.08,
+    "action_history_limit": 10,
+    "command_vocabulary": [
+      "patrol_area",
+      "seek_enemies",
+      "hold_position",
+      "return_to_safe_zone",
+      "status"
+    ]
+  },
+  "intelligent_agent_decision_thresholds": {
+    "_note": "AI Safety Overrides & Strategic Preferences. REF: ai/IntelligentAgent.js lines 140-210",
+    "_documentation": "These thresholds control when AI prioritizes retreat (safety) over requests (strategy). Order matters: Rules 1-3 are non-negotiable; Rules 4+ are preferences.",
+    "safety_rules": {
+      "rule_1_critical_health_threshold": {
+        "value": 25,
+        "description": "If health < this, MUST retreat regardless of mode request",
+        "priority": "CRITICAL",
+        "side_effect": "overrides seek_enemies, hold_position"
+      },
+      "rule_2_low_health_check": {
+        "value": 40,
+        "description": "If health < this AND ammo < low_ammo_check, MUST retreat",
+        "priority": "CRITICAL",
+        "paired_with": "low_ammo_check"
+      },
+      "rule_2_low_ammo_check": {
+        "value": 5,
+        "description": "If ammo < this AND health < low_health_check, MUST retreat",
+        "priority": "CRITICAL",
+        "paired_with": "low_health_check"
+      },
+      "rule_3_zero_ammo_corrupted_zone": {
+        "zero_ammo_threshold": 1,
+        "description": "If ammo < this AND in corrupted_zone, force hold_position (defensive)",
+        "priority": "CRITICAL",
+        "side_effect": "blocks seek_enemies"
+      }
+    },
+    "strategy_preferences": {
+      "good_resources_min_health": {
+        "value": 60,
+        "description": "If health >= this AND ammo >= good_resources_min_ammo, allow requested aggressive mode"
+      },
+      "good_resources_min_ammo": {
+        "value": 20,
+        "description": "If ammo >= this AND health >= good_resources_min_health, allow requested aggressive mode"
+      },
+      "moderate_resources_health_range": {
+        "min": 40,
+        "max": 60,
+        "description": "If health in [40-60] AND ammo >= moderate_ammo_min, allow requested mode with caution"
+      },
+      "moderate_resources_min_ammo": {
+        "value": 5,
+        "description": "If ammo >= this AND health in moderate_range, allow requested mode"
+      }
+    },
+    "logging_thresholds": {
+      "reason_health_threshold": {
+        "value": 30,
+        "description": "For reason text generation: used in getDecisionReason()",
+        "priority": "LOW"
+      },
+      "reason_ammo_threshold": {
+        "value": 10,
+        "description": "For reason text generation: used in getDecisionReason()",
+        "priority": "LOW"
+      }
+    }
+  },
+  "agent_bridge_network": {
+    "_note": "Network timeouts and UI debouncing. REF: ai/AgentBridge.js",
+    "context_load_timeout_ms": 30000,
+    "context_load_timeout_description": "Maximum wait for AI context fetch (per file). Must match SYSTEM_FLOW_BLUEPRINT fallback rules.",
+    "ui_render_debounce_ms": 100,
+    "ui_render_debounce_description": "Throttle DOM updates during rapid state changes. Applied to banner visibility toggle."
+  },
+  "core_game_settings": {
+    "_note": "Game balance & physics tuning. REF: js/omni-core-game.js SETTINGS object",
+    "player_controls": {
+      "mouse_sensitivity": 0.002,
+      "ads_sensitivity_multiplier": 0.5,
+      "movement_acceleration": 130,
+      "movement_friction": 12,
+      "max_walk_speed": 8,
+      "max_sprint_speed": 28,
+      "max_ads_speed": 3.5,
+      "max_crouch_speed": 4,
+      "jump_force": 11
+    },
+    "camera": {
+      "base_fov": 85,
+      "ads_fov": 50,
+      "sprint_fov": 105,
+      "gun_spring_stiffness": 120,
+      "gun_spring_damping": 15,
+      "_note_spring": "Weapon inertia system. Higher stiffness = snappier. Higher damping = smoother."
+    },
+    "combat": {
+      "reload_time_seconds": 1.8,
+      "magazine_size": 30,
+      "starting_reserve_ammo": 90,
+      "fire_rate_seconds": 0.1,
+      "burst_delay_seconds": 0.08,
+      "fire_modes": ["AUTO", "BURST", "SINGLE"],
+      "tracer_speed": 320,
+      "_note": "Tracer speed affects visual bullet travel appearance"
+    },
+    "player_state": {
+      "base_health": 100,
+      "base_stamina": 100,
+      "stamina_drain_per_second_sprint": 20,
+      "stamina_recovery_per_second": 10,
+      "exhaustion_threshold": 20,
+      "player_radius": 0.5,
+      "eye_level_height": 1.6,
+      "crouch_height": 0.9,
+      "_note": "Eye level is standing height. Crouch height affects collision."
+    },
+    "world": {
+      "gravity": 35,
+      "world_tile_size": 12,
+      "world_tile_count": 50,
+      "interact_distance": 5.0,
+      "commander_speed": 40,
+      "body_decay_time_ms": 1200000,
+      "_note_decay": "Dead bodies disappear after 20 minutes"
+    },
+    "network": {
+      "net_update_rate_hz": 50,
+      "master_volume": 1.0,
+      "hifi_audio_enabled": true,
+      "_note": "HiFi audio produces more detailed sound mixing"
+    },
+    "persistence": {
+      "save_interval_ms": 60000,
+      "_note": "Auto-save every 60 seconds"
+    },
+    "physics": {
+      "physics_sub_steps": 10,
+      "max_delta_clamped_ms": 50,
+      "_note": "Fixed timestep: run physics 10 times per frame, clamp delta to 50ms max"
+    },
+    "reputation": {
+      "squad_default": 100,
+      "citizen_default": 0,
+      "raider_default": -100
+    },
+    "ui_updates": {
+      "frame_counter_interval": 30,
+      "stamina_threshold_for_camera_shake": 15,
+      "stamina_bar_colors": {
+        "normal": "#00ffcc",
+        "low": "#ff0000"
+      },
+      "pointer_lock_retry_delay_ms": 100,
+      "game_start_dialogue_delay_ms": 100,
+      "peer_init_delay_ms": 50,
+      "pointer_lock_max_attempts": 5
+    }
+  },
+  "python_server_settings": {
+    "_note": "Agent server configuration. REF: agent_with_tracing.py CONFIG",
+    "host": "127.0.0.1",
+    "port": 8080,
+    "timeout_seconds": 30,
+    "payload_size_limit_bytes": 102400,
+    "_note_payload": "100KB maximum request body size",
+    "max_prompt_length_chars": 2000,
+    "cors": {
+      "allow_origin": "*",
+      "allow_methods": "GET, POST, OPTIONS",
+      "allow_headers": "Content-Type, Authorization"
+    },
+    "routes": {
+      "_note": "All routes below return 200 OK with status: ready",
+      "health": "GET /health",
+      "alive": "GET /alive",
+      "api_universal": "GET|POST /api/* (universal handler - prevents 404 hangs)",
+      "chat": "POST /chat"
+    }
+  },
+  "logging": {
+    "_note": "Structured logging with error context. Use console.error('[Module::method]', msg, state)",
+    "format": "[ModuleName::methodName] message { context }",
+    "level_trace": false,
+    "level_debug": true,
+    "level_info": true,
+    "level_warn": true,
+    "level_error": true,
+    "forbidden": "opentelemetry, tracing libraries (cause crashes)"
+  },
+  "code_style": {
+    "_note": "Mandatory rules from .github/copilot-instructions.md",
+    "variable_declaration": "const by default, let only for mutation, NEVER var",
+    "equality": "=== only, never ==",
+    "magic_numbers": "FORBIDDEN - use CONFIG_MASTER.json instead",
+    "memory_allocation": "Zero allocation inside update()/render() loops",
+    "math_object_reuse": "Declare at module scope, reuse every frame (Vector3, Matrix4, Quaternion)",
+    "dom_access": "Always null guard: const el = document.getElementById(id); if (el) { ... }",
+    "architecture_boundaries": [
+      "Physics NEVER touches DOM or calls UI functions",
+      "UI NEVER reads physics state directly - use SignalBus",
+      "Network NEVER blocks game loop - always async + timeout + fallback",
+      "Render NEVER mutates game state"
+    ]
+  },
+  "error_handling": {
+    "_note": "Defensive programming at all external boundaries",
+    "network_failures": "Wrap fetch in try/catch + AbortController timeout",
+    "dom_mutations": "Null guard before every write",
+    "state_corruption": "Assertion guards for impossible states",
+    "fallback_behavior": "Graceful degradation, never crash"
+  }
+}

@@ -11,7 +11,7 @@ const AILiveCam = {
     updateInterval: null,
     statsInterval: null,
     thoughtUpdateInterval: null,
-    serverUrl: 'http://localhost:8080',
+    serverUrl: 'http://127.0.0.1:8080',
     
     init: function() {
         console.log('[AI Live Cam] Creating UI...');

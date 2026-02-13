@@ -391,7 +391,20 @@
         </div>
     </div>
 
+    <!-- ============================================================================
+         CRITICAL DEPENDENCY LOADING - THREE.js MUST be fully loaded before game code
+         ============================================================================ -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // ✅ MANDATORY: Block until THREE.js is confirmed loaded
+        if (typeof THREE === 'undefined') {
+            document.body.innerHTML = '<div style="color:red;padding:50px;font-family:monospace;">CRITICAL: THREE.js failed to load from CDN. Check network connection.</div>';
+            throw new Error('[BOOT] THREE.js CDN load failed');
+        }
+        console.log('[BOOT] ✓ THREE.js loaded successfully (v' + THREE.REVISION + ')');
+        window.THREE = THREE; // Ensure global reference
+    </script>
+    
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     
     <!-- OMNI-OPS: Chapter 1 System -->
@@ -412,7 +425,27 @@
                 logEl.innerHTML = 'Recent logs:<br>' + window.pageLog.slice(-10).join('<br>');
             }
         };
-        console.log('Page loaded, waiting for modules...');
+        console.log('[BOOT] Page loaded, waiting for modules...');
+        
+        // ✅ CRITICAL: Global error handler for module loading failures
+        window.addEventListener('error', (event) => {
+            if (event.filename && event.filename.includes('.js')) {
+                console.error('[BOOT] Script load error:', event.filename, event.message);
+                console.error('[BOOT] Error details:', {
+                    message: event.message,
+                    filename: event.filename,
+                    lineno: event.lineno,
+                    colno: event.colno,
+                    error: event.error
+                });
+                
+                // If THREE is missing, this is critical
+                if (typeof THREE === 'undefined') {
+                    console.error('[BOOT] CRITICAL: THREE.js is not defined - core dependency missing');
+                    document.body.innerHTML = '<div style="color:red;padding:50px;font-family:monospace;"><h1>BOOT FAILURE</h1><p>THREE.js dependency failed to load.</p><p>Check console for details.</p></div>';
+                }
+            }
+        }, true);
         
         // Wrap the entire window in error protection
         const originalEval = window.eval;
@@ -428,9 +461,10 @@
         };
     </script>
     <!-- CORE MODULES - MUST LOAD FIRST -->
-    <script src="scripts/omni-main.js" defer></script>
-    <script src="scripts/omni-diagnostics.js" defer></script>
-    <script src="scripts/startup-verify.js" defer></script>
+    <script src="js/omni-core-game.js" defer onerror="console.error('[BOOT] CRITICAL: omni-core-game.js failed to load!'); document.body.innerHTML='<div style=&quot;color:red;padding:50px;font-family:monospace;&quot;>CRITICAL: Core game module failed to load. Check console for details.</div>';"></script>
+    <script src="scripts/omni-main.js" defer onerror="console.error('[BOOT] WARNING: omni-main.js failed to load')"></script>
+    <script src="scripts/omni-diagnostics.js" defer onerror="console.error('[BOOT] WARNING: omni-diagnostics.js failed to load')"></script>
+    <script src="scripts/startup-verify.js" defer onerror="console.error('[BOOT] WARNING: startup-verify.js failed to load')"></script>
     <!-- AI SYSTEM - LOADS AFTER CORE MODULES -->
     <script src="js/omni-ai-game-bridge.js" defer></script>
     <script src="js/omni-unified-control-panel.js" defer></script>
@@ -443,14 +477,68 @@
     <!-- TEST HARNESS - Minimal MVP for automated testing (console/external tools only) -->
     <script src="ai/ai_test_harness.js" defer></script>
     <script>
-        // Auto-run diagnostics after game loads (optional - user can call manually)
+        // ============================================================================
+        // PHASE 3.5 DIAGNOSTIC: Verify Core Game Module and UI Initialization
+        // ============================================================================
+        console.log('[INDEX] ========================================');
+        console.log('[INDEX] PHASE 3.5: UI INITIALIZATION DIAGNOSTIC');
+        console.log('[INDEX] ========================================');
+        
+        // Check 1: THREE.js availability
+        const checkThree = () => {
+            const available = typeof THREE !== 'undefined';
+            console.log(`[INDEX] ✅ THREE.js: ${available ? 'AVAILABLE' : 'MISSING'}`);
+            return available;
+        };
+        
+        // Check 2: window.initializeUI availability (will retry if not yet loaded)
+        const checkInitializeUI = (attempt = 0) => {
+            const maxAttempts = 10;
+            const isFunction = typeof window.initializeUI === 'function';
+            
+            if (isFunction) {
+                console.log(`[INDEX] ✅ window.initializeUI: CALLABLE (found on attempt ${attempt}/10)`);
+                return true;
+            } else if (attempt < maxAttempts) {
+                if (attempt === 0) {
+                    console.log(`[INDEX] ⏳ window.initializeUI: NOT YET AVAILABLE, retrying...`);
+                }
+                setTimeout(() => checkInitializeUI(attempt + 1), 200);
+                return false;
+            } else {
+                console.error(`[INDEX] ❌ window.initializeUI: NOT FOUND after ${maxAttempts} retries`);
+                return false;
+            }
+        };
+        
+        // Auto-run diagnostics after game loads
         window.addEventListener('load', () => {
+            console.log('[INDEX] load event fired');
+            
             setTimeout(() => {
-                if (window.OmniDiagnostics) {
-                    console.log('Run OmniDiagnostics.runAllChecks() in console to validate game systems');
+                checkThree();
+                
+                if (typeof window.OmniDiagnostics === 'object') {
+                    console.log('[INDEX] ℹ OmniDiagnostics available - run window.OmniDiagnostics.runAllChecks() in console');
+                }
+                
+                // Check SignalBus
+                if (typeof window.SignalBus === 'object') {
+                    console.log('[INDEX] ✅ window.SignalBus: AVAILABLE (created by initializeUI)');
+                } else {
+                    console.log('[INDEX] ℹ window.SignalBus: Not yet created (will be created by initializeUI)');
                 }
             }, 3000);
         });
+        
+        // Immediate check for Three.js
+        console.log('[INDEX] THREE.js:', typeof THREE);
+        
+        // Delayed check for initializeUI (script is deferred)
+        setTimeout(() => {
+            console.log('[INDEX] Checking window.initializeUI after module load...');
+            checkInitializeUI();
+        }, 100);
         
         // Safety net: Force show menu if loading takes too long
         setTimeout(() => {
@@ -458,21 +546,29 @@
             const menuOverlay = document.getElementById('menu-overlay');
             
             if (loadingScreen && loadingScreen.style.display !== 'none' && !loadingScreen.classList.contains('hidden')) {
-                console.warn('[Safety Net] Loading screen still showing after 15 seconds, forcing menu display');
+                console.warn('[UI-BOOT] [Safety Net] Loading screen still showing after 15 seconds, forcing menu display');
                 loadingScreen.classList.add('hidden');
                 if (menuOverlay) menuOverlay.style.display = 'flex';
                 window.modulesReady = true;
                 
                 // Try to initialize UI if it exists
-                if (window.initializeUI) {
+                if (typeof window.initializeUI === 'function') {
                     try {
+                        console.log('[UI-BOOT] [Safety Net] Calling window.initializeUI()...');
                         window.initializeUI();
+                        console.log('[UI-BOOT] [Safety Net] ✅ initializeUI() completed successfully');
                     } catch (e) {
-                        console.error('[Safety Net] Error calling initializeUI:', e);
+                        console.error('[UI-BOOT] [Safety Net] ❌ Error calling initializeUI:', e);
                     }
+                } else {
+                    console.error('[UI-BOOT] [Safety Net] ❌ window.initializeUI is not a function!');
+                    console.error('[UI-BOOT] [Safety Net] Type:', typeof window.initializeUI);
+                    console.error('[UI-BOOT] [Safety Net] Value:', window.initializeUI);
                 }
             }
         }, 15000);
+        
+        console.log('[INDEX] ========================================');
     </script>
     <!-- COMPLETE AI SYSTEM - Browser-integrated vision, control, and orchestration -->
     <script src="js/ai-complete-system.js" defer></script>

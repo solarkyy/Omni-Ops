@@ -4,7 +4,7 @@
 (function() {
     'use strict';
 
-    const AI_BRIDGE_URL = 'http://localhost:5000';
+    const AI_BRIDGE_URL = 'http://127.0.0.1:5000';
     let bridgeConnected = false;
     let aiDecisionCache = new Map();
     let cacheExpiry = 5000; // 5 second cache

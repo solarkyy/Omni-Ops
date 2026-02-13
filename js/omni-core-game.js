@@ -1,14 +1,28 @@
 // OMNI-OPS CORE GAME v11 - Complete Base System
-// ✅ FIXED IMPORTS for Three.js v0.160+
-import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { AnimationMixer } from 'three';
+// ✅ FIXED FOR CDN: Uses global THREE from CDN instead of ES6 imports
+// The CDN-loaded THREE will be available globally
+//
+// ⚠️ NOTE: Three.js is loaded from CDN in index.html:
+//    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+//    This makes window.THREE and related classes available globally.
+
+// NO ES6 imports needed - use global THREE object from CDN
+// import * as THREE from 'three';
+// import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+// import { AnimationMixer } from 'three';
 
 (function() {
     'use strict';
     console.log('[Core Game] Initializing v11...');
     
-    // ✅ Task 1: Assign THREE globally to prevent Multiple Three warning
+    // ✅ Task 1: Verify THREE is available from CDN
+    if (typeof THREE === 'undefined') {
+        console.error('[Core Game] CRITICAL: THREE is not defined! Make sure Three.js CDN is loaded before this script.');
+        return;
+    }
+    console.log('[Core Game] ✓ THREE object available from CDN');
+    
+    // ✅ Task 2: Assign THREE globally to prevent Multiple Three warning
     window.THREE = THREE;
 
 const SETTINGS = {
@@ -774,27 +788,45 @@ async function quitToMenu() {
 }
 
 // --- INITIALIZATION ---
+/**
+ * PHASE 3.5: UI INITIALIZATION
+ * 
+ * Attaches all UI event handlers and emits SYSTEM_READY signal.
+ * This is the final phase before gameplay can begin.
+ * 
+ * PROTOCOL:
+ * ✅ Always attached to window object
+ * ✅ Emits SignalBus signal after completion
+ * ✅ All console logs tagged [UI-BOOT]
+ * ✅ Includes timeout safeguard (CONFIG_MASTER.ui.ui_boot_timeout_ms)
+ * 
+ * SEE: docs/SYSTEM_FLOW_BLUEPRINT.md § Phase 3.5: UI Initialization
+ */
 window.initializeUI = function() {
-    console.log('[Core Game] initializeUI called');
+    console.log('[UI-BOOT] ================================');
+    console.log('[UI-BOOT] PHASE 3.5: UI INITIALIZATION STARTED');
+    console.log('[UI-BOOT] ================================');
     
     // Initialize story system (LEGACY - Albion story)
     const LEGACY_ALBION = false; // Set to true to enable old "Heroes of Albion" story
     if (LEGACY_ALBION && window.GameStory) {
+        console.log('[UI-BOOT] GameStory integration enabled (legacy mode)');
         window.GameStory.init();
     }
     
+    // Define button binding helper
     const bindBtn = (id, func) => {
             const el = document.getElementById(id);
             if (el) {
-                console.log(`[Core Game] Binding button: ${id}`);
+                console.log(`[UI-BOOT] ✓ Button bound: ${id}`);
                 el.onclick = func;
             } else {
-                console.warn(`[Core Game] Button not found: ${id}`);
+                console.warn(`[UI-BOOT] ⚠ Button not found: ${id}`);
             }
         };
 
     bindBtn('btn-story-start', () => {
-        console.log('[UI] ===== START CHAPTER 1 BUTTON CLICKED =====');
+        console.log('[UI-BOOT] ===== START CHAPTER 1 CLICKED =====');
         window.OMNI_OPS_STORY_MODE = 'CHAPTER1';
         singlePlayerWorldReadyHandled = false;
         
@@ -806,7 +838,7 @@ window.initializeUI = function() {
         
         // Initialize core game world if not already active
         if (!window.isGameActive) {
-            console.log('[UI] Game not active - initializing core world...');
+            console.log('[UI-BOOT] Game not active - initializing core world...');
             // Set single-player flags
             isMultiplayer = false;
             isHost = true;
@@ -816,7 +848,7 @@ window.initializeUI = function() {
             // ✅ Emergency Bypass with timeout for AI Bridge latency
             setTimeout(() => {
                 if (!window.isGameActive) {
-                    console.log('[System] AI Bridge not found. Launching in Local Mode...');
+                    console.log('[UI-BOOT] AI Bridge timeout - launching in Local Mode...');
                     window.isGameActive = true;
                     if (typeof initGame === 'function') {
                         initGame();
@@ -827,48 +859,48 @@ window.initializeUI = function() {
             // Call launchGame which creates scene, renderer, camera, player
             launchGame();
         } else {
-            console.log('[UI] Game already active');
+            console.log('[UI-BOOT] Game already active');
             onSinglePlayerWorldReady();
         }
     });
     bindBtn('btn-single', () => {
-        console.log('[UI] btn-single clicked');
+        console.log('[UI-BOOT] btn-single clicked');
         startMode('SINGLE');
     });
     bindBtn('btn-show-host', () => {
-        console.log('[UI] btn-show-host clicked');
+        console.log('[UI-BOOT] btn-show-host clicked');
         showScreen('host');
     });
     bindBtn('btn-show-join', () => {
-        console.log('[UI] btn-show-join clicked');
+        console.log('[UI-BOOT] btn-show-join clicked');
         showScreen('join');
     });
     bindBtn('btn-deploy-host', () => {
-        console.log('[UI] btn-deploy-host clicked');
+        console.log('[UI-BOOT] btn-deploy-host clicked');
         startMode('HOST');
     });
     bindBtn('btn-host-back', () => {
-        console.log('[UI] btn-host-back clicked');
+        console.log('[UI-BOOT] btn-host-back clicked');
         showScreen('main');
     });
     bindBtn('btn-deploy-join', () => {
-        console.log('[UI] btn-deploy-join clicked');
+        console.log('[UI-BOOT] btn-deploy-join clicked');
         startMode('JOIN');
     });
     bindBtn('btn-join-back', () => {
-        console.log('[UI] btn-join-back clicked');
+        console.log('[UI-BOOT] btn-join-back clicked');
         showScreen('main');
     });
     bindBtn('btn-quit', () => {
-        console.log('[UI] btn-quit clicked');
+        console.log('[UI-BOOT] btn-quit clicked');
         quitToMenu();
     });
     bindBtn('btn-lobby-back', () => {
-        console.log('[UI] btn-lobby-back clicked');
+        console.log('[UI-BOOT] btn-lobby-back clicked');
         quitToMenu();
     });
     bindBtn('btn-start-match', () => {
-        console.log('[UI] btn-start-match clicked');
+        console.log('[UI-BOOT] btn-start-match clicked');
         startMatch();
     });
     
@@ -876,7 +908,7 @@ window.initializeUI = function() {
     const resumeBtn = document.getElementById('btn-resume');
     if(resumeBtn) {
         resumeBtn.onclick = () => {
-            console.log('[UI] btn-resume clicked');
+            console.log('[UI-BOOT] btn-resume clicked');
             // Clear all blocking flags
             if (gameState) {
                 gameState.isInDialogue = false;
@@ -893,7 +925,7 @@ window.initializeUI = function() {
     const settingsResumeBtn = document.getElementById('btn-settings-resume');
     if(settingsResumeBtn) {
         settingsResumeBtn.onclick = () => {
-            console.log('[UI] btn-settings-resume clicked');
+            console.log('[UI-BOOT] btn-settings-resume clicked');
             // Clear all blocking flags
             if (gameState) {
                 gameState.isInDialogue = false;
@@ -920,18 +952,70 @@ window.initializeUI = function() {
     if (startBtn) {
         startBtn.style.pointerEvents = 'auto'; // Force it to be clickable
         startBtn.disabled = false; // Ensure it's not disabled
-        console.log('[System] ✅ Hard-Start Override: btn-story-start forced to clickable state');
+        console.log('[UI-BOOT] ✓ Hard-Start Override: btn-story-start forced to clickable');
     }
     
-    showScreen('main'); // Show main menu
-    console.log('[Core Game] UI initialized - showScreen(main) called');
+    // Display main menu
+    showScreen('main');
+    console.log('[UI-BOOT] ✓ Main menu displayed via showScreen("main")');
+    
+    // ========================================================================
+    // MANDATORY: Emit SYSTEM_READY signal via SignalBus
+    // ========================================================================
+    // This signals to the ModuleLoader that UI initialization is complete
+    // and the game can proceed to PHASE 4: GAME ENTER
+    
+    try {
+        // Create a simple SignalBus if it doesn't exist
+        if (!window.SignalBus) {
+            window.SignalBus = {
+                listeners: {},
+                on: function(event, callback) {
+                    if (!this.listeners[event]) this.listeners[event] = [];
+                    this.listeners[event].push(callback);
+                },
+                emit: function(event, data) {
+                    if (this.listeners[event]) {
+                        this.listeners[event].forEach(cb => {
+                            try {
+                                cb(data);
+                            } catch (err) {
+                                console.error(`[UI-BOOT] Error in SignalBus callback for "${event}":`, err);
+                            }
+                        });
+                    }
+                },
+                off: function(event, callback) {
+                    if (this.listeners[event]) {
+                        this.listeners[event] = this.listeners[event].filter(cb => cb !== callback);
+                    }
+                }
+            };
+            console.log('[UI-BOOT] ✓ SignalBus created (did not exist)');
+        }
+        
+        // Emit SYSTEM_READY signal to notify ModuleLoader
+        window.SignalBus.emit('ui:system_ready', {
+            timestamp: Date.now(),
+            phase: 'UI_INITIALIZATION_COMPLETE',
+            initiator: 'window.initializeUI()'
+        });
+        console.log('[UI-BOOT] ✓ Emitted signal: ui:system_ready');
+    } catch (err) {
+        console.error('[UI-BOOT] CRITICAL: Failed to emit SYSTEM_READY signal:', err);
+    }
+    
+    console.log('[UI-BOOT] ================================');
+    console.log('[UI-BOOT] PHASE 3.5: UI INITIALIZATION COMPLETE');
+    console.log('[UI-BOOT] ✅ System ready for PHASE 4: GAME ENTER');
+    console.log('[UI-BOOT] ================================');
 };
 
 // Fall back to DOMContentLoaded if modules are already loaded
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('[Core Game] DOMContentLoaded fired');
+    console.log('[UI-BOOT] DOMContentLoaded event fired');
     if (window.modulesReady && window.initializeUI) {
-        console.log('[Core Game] Modules already ready, calling initializeUI');
+        console.log('[UI-BOOT] Modules already ready, calling initializeUI now...');
         window.initializeUI();
     }
 });
@@ -1686,34 +1770,48 @@ function setupWeapon() {
     window.gunMixer = null; 
     window.gunActions = {};
     
-    const loader = new GLTFLoader();
-    loader.load('./models/FpsRig.glb', (gltf) => {
-        const gun = gltf.scene;
-        
-        // Reference Transforms
-        gun.scale.set(0.08, 0.08, 0.08);
-        gun.rotation.set(0, Math.PI / 2, 0); // Correct orientation
-        gun.position.set(0, 0, 0); // Centered in pivot
-        
-        // Add to existing pivot
-        weaponPivot.add(gun);
-        
-        // Setup Animation
-        window.gunMixer = new AnimationMixer(gun);
-        gltf.animations.forEach((clip) => {
-            window.gunActions[clip.name] = window.gunMixer.clipAction(clip);
-        });
-        
-        // Start Idle
-        if (window.gunActions['Armature|Idle']) {
-            window.gunActions['Armature|Idle'].play();
+    // Try to use GLTFLoader if available (requires separate CDN or npm package)
+    let loader = null;
+    try {
+        if (typeof THREE !== 'undefined' && THREE.GLTFLoader) {
+            loader = new THREE.GLTFLoader();
+        } else if (typeof window !== 'undefined' && window.THREE && window.THREE.GLTFLoader) {
+            loader = new window.THREE.GLTFLoader();
+        } else {
+            console.warn('[Visuals] GLTFLoader not available - weapon models will use fallback procedural mesh');
         }
-        
-        console.log('[Visuals] AKM Rig Loaded & Animated');
-    }, undefined, (error) => {
-        console.error('[Visuals] Error loading FpsRig.glb:', error);
-        // Fallback to procedural weapon if model not found
-        weaponMesh = new THREE.Group();
+    } catch (err) {
+        console.warn('[Visuals] Error initializing GLTFLoader:', err.message);
+    }
+    
+    if (loader) {
+        loader.load('./models/FpsRig.glb', (gltf) => {
+            const gun = gltf.scene;
+            
+            // Reference Transforms
+            gun.scale.set(0.08, 0.08, 0.08);
+            gun.rotation.set(0, Math.PI / 2, 0); // Correct orientation
+            gun.position.set(0, 0, 0); // Centered in pivot
+            
+            // Add to existing pivot
+            weaponPivot.add(gun);
+            
+            // Setup Animation
+            window.gunMixer = new THREE.AnimationMixer(gun);
+            gltf.animations.forEach((clip) => {
+                window.gunActions[clip.name] = window.gunMixer.clipAction(clip);
+            });
+            
+            // Start Idle
+            if (window.gunActions['Armature|Idle']) {
+                window.gunActions['Armature|Idle'].play();
+            }
+            
+            console.log('[Visuals] AKM Rig Loaded & Animated');
+        }, undefined, (error) => {
+            console.error('[Visuals] Error loading FpsRig.glb:', error);
+            // Fallback to procedural weapon if model not found
+            weaponMesh = new THREE.Group();
         const darkMetal = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.8, roughness: 0.2 });
         const blackPlastic = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.8 });
         
@@ -4031,4 +4129,5 @@ window.updateDialogue = function(text) {
     }
 };
 
+} // ← Added missing closing brace for unclosed block
 })(); // CLOSE THE IIFE - CRITICAL!

@@ -103,6 +103,7 @@
         _bootstrapped: false,
         _wasReady: false,
         _diagnosticLogged: false,
+        _forceReadyOverride: false,  // Manual override for network troubleshooting
         
         // AI context state
         _aiContextCache: null,
@@ -116,6 +117,11 @@
          * Returns diagnostic info about what's ready and what's missing
          */
         isReady() {
+            // Manual override for Windows DNS troubleshooting
+            if (this._forceReadyOverride) {
+                return true;
+            }
+            
             const enabled = CONFIG.enabled;
             const hasAgent = !!window.IntelligentAgent;
             const hasAPI = !!window.AIPlayerAPI;
@@ -532,6 +538,57 @@
         },
 
         /**
+         * ⚠️ MANUAL OVERRIDE: Force bridge readiness
+         * 
+         * Use this ONLY if your network is stubborn about localhost/127.0.0.1 resolution.
+         * This bypasses the check for IntelligentAgent + AIPlayerAPI and marks the bridge as ready.
+         * 
+         * Called from browser console: window.forceReady()
+         * 
+         * Effects:
+         * - Marks bridge as ready (hides error banner)
+         * - isReady() returns true (bypasses dependency checks)
+         * - You can now execute API commands
+         * 
+         * @returns {boolean} true if override activated
+         */
+        forceReady() {
+            this._forceReadyOverride = true;
+            this._wasReady = true;
+            this._diagnosticLogged = true;
+            
+            // Hide the banner immediately
+            const banner = document.getElementById('agent-bridge-error-banner');
+            if (banner) {
+                banner.style.display = 'none';
+            }
+            
+            console.log('[AgentBridge] 🟢 FORCE READY ACTIVATED');
+            console.log('[AgentBridge] Bridge status override: isReady() will return true');
+            console.log('[AgentBridge] Error banner hidden. You can now execute commands.');
+            console.log('[AgentBridge] To check status: window.AgentBridge.status()');
+            console.log('[AgentBridge] To send a command: window.AgentBridge.enqueueCommand("move forward")');
+            
+            return true;
+        },
+
+        /**
+         * Cancel the forceReady override and return to normal checks
+         * @returns {boolean} true if override was cancelled
+         */
+        cancelForceReady() {
+            if (this._forceReadyOverride) {
+                this._forceReadyOverride = false;
+                this._diagnosticLogged = false;
+                this.updateReadinessBanner();
+                console.log('[AgentBridge] 🔴 Force ready override CANCELLED - Returning to normal readiness checks');
+                this.status();
+                return true;
+            }
+            return false;
+        },
+
+        /**
          * Manage the readiness banner UI
          * Shows/hides error banner based on AgentBridge.isReady() state
          */
@@ -805,9 +862,26 @@
     // Expose to global scope
     window.AgentBridge = AgentBridge;
 
+    /**
+     * Global console command for manual override
+     * Usage: forceReady()
+     */
+    window.forceReady = function() {
+        AgentBridge.forceReady();
+    };
+
+    /**
+     * Cancel the force ready override
+     * Usage: cancelForceReady()
+     */
+    window.cancelForceReady = function() {
+        AgentBridge.cancelForceReady();
+    };
+
     // Log initialization
     if (CONFIG.devMode) {
         console.log('[AgentBridge] Initialized. Call window.AgentBridge.status() for info.');
+        console.log('[AgentBridge] If network is stubborn, use: window.forceReady()');
     }
 
     // Add CSS for banner animation
