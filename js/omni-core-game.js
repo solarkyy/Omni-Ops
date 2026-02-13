@@ -140,6 +140,8 @@ function initGame() {
         
         console.log('[initGame] Creating THREE.Scene...');
         scene = new THREE.Scene();
+        console.log('[World] Scene created');
+        window.scene = scene;
         // Fable-style sky colors
         scene.background = new THREE.Color(0x87ceeb); // Sky blue
         scene.fog = new THREE.FogExp2(0x87ceeb, SETTINGS.HIFI ? 0.008 : 0);
@@ -159,9 +161,14 @@ function initGame() {
         console.log('[initGame] Camera rig positioned at:', cameraRig.position);
         console.log('[initGame] Camera offset from rig:', camera.position);
         console.log('[initGame] Camera looking at:', camera.getWorldDirection(new THREE.Vector3()));
+        console.log('[World] Camera initialized');
+        console.log('[World] Player spawned');
         
         scene.add(cameraRig);
         cameraRig.add(camera);
+        window.camera = camera;
+        window.cameraRig = cameraRig;
+        window.player = player;
 
         commanderCamera = new THREE.PerspectiveCamera(SETTINGS.FOV_BASE, window.innerWidth / window.innerHeight, 0.01, 1000);
         commanderCamera.rotation.x = -Math.PI / 2; 
@@ -198,6 +205,7 @@ function initGame() {
         console.log('[initGame] Canvas properties - id:', renderer.domElement.id, 'class:', renderer.domElement.className);
         
         document.body.appendChild(renderer.domElement);
+        window.renderer = renderer;
         
         console.log('[initGame] Canvas appended to body, checking if visible...');
         console.log('[initGame] Canvas in DOM:', document.body.contains(renderer.domElement));
@@ -207,28 +215,37 @@ function initGame() {
         
         console.log('[initGame] Setting up lighting...');
         setupLighting();
+        window.sunLight = sunLight;
         
-        console.log('[initGame] Creating ground plane...');
-        const grassMat = new THREE.MeshStandardMaterial({ color: 0x223311 });
-        groundPlane = new THREE.Mesh(new THREE.PlaneGeometry(2000, 2000), grassMat);
-        groundPlane.rotation.x = -Math.PI / 2; 
-        groundPlane.receiveShadow = true; 
-        groundPlane.userData = { ue5: true, type: 'terrain', editorPlaceable: true }; // Mark for editor raycasting
-        scene.add(groundPlane);
+        if (window.OMNI_OPS_STORY_MODE === 'CHAPTER1') {
+            console.log('[initGame] Chapter 1 mode active - skipping sandbox ground/test objects');
+        } else {
+            console.log('[initGame] Creating ground plane...');
+            const grassMat = new THREE.MeshStandardMaterial({ color: 0x223311 });
+            groundPlane = new THREE.Mesh(new THREE.PlaneGeometry(2000, 2000), grassMat);
+            groundPlane.rotation.x = -Math.PI / 2; 
+            groundPlane.receiveShadow = true; 
+            groundPlane.userData = { ue5: true, type: 'terrain', editorPlaceable: true }; // Mark for editor raycasting
+            scene.add(groundPlane);
+            
+            // TEST CUBE - Should be clearly visible
+            console.log('[initGame] Adding test cube for visibility check...');
+            const testCube = new THREE.Mesh(
+                new THREE.BoxGeometry(5, 5, 5),
+                new THREE.MeshStandardMaterial({ color: 0xff0000, emissive: 0xff0000, emissiveIntensity: 0.5 })
+            );
+            testCube.position.set(0, 2.5, 20);
+            scene.add(testCube);
+            console.log('[initGame] Test cube added at position:', testCube.position);
+        }
         
-        // TEST CUBE - Should be clearly visible
-        console.log('[initGame] Adding test cube for visibility check...');
-        const testCube = new THREE.Mesh(
-            new THREE.BoxGeometry(5, 5, 5),
-            new THREE.MeshStandardMaterial({ color: 0xff0000, emissive: 0xff0000, emissiveIntensity: 0.5 })
-        );
-        testCube.position.set(0, 2.5, 20);
-        scene.add(testCube);
-        console.log('[initGame] Test cube added at position:', testCube.position);
-        
-        console.log('[initGame] Generating world...');
-        // Use Centralized Seed
-        generateWorld(gameState.worldSeed);
+        if (window.OMNI_OPS_STORY_MODE === 'CHAPTER1') {
+            console.log('[initGame] Chapter 1 mode active - skipping sandbox world generation');
+        } else {
+            console.log('[initGame] Generating world...');
+            // Use Centralized Seed
+            generateWorld(gameState.worldSeed);
+        }
         
         console.log('[initGame] Setting up weapon...');
         setupWeapon();
@@ -237,7 +254,9 @@ function initGame() {
         try { spawnAIUnits(); } catch(e) { console.error('[initGame] Error spawning AI:', e); }
         
         console.log('[initGame] Initializing living world...');
-        if (window.LivingWorldNPCs) {
+        if (window.OMNI_OPS_STORY_MODE === 'CHAPTER1') {
+            console.log('[initGame] Chapter 1 mode active - skipping Living World sandbox population');
+        } else if (window.LivingWorldNPCs) {
             try { window.LivingWorldNPCs.init(); } catch(e) { console.error('[initGame] Living World init error:', e); }
         } else {
             console.warn('[initGame] Living World module not loaded, falling back to zone NPCs');
@@ -260,6 +279,44 @@ function initGame() {
         console.error('[initGame] Stack:', err.stack);
         alert('Game initialization failed: ' + err.message);
         quitToMenu();
+    }
+}
+
+let singlePlayerWorldReadyHandled = false;
+
+function onSinglePlayerWorldReady() {
+    if (singlePlayerWorldReadyHandled) return;
+    singlePlayerWorldReadyHandled = true;
+
+    if (window.OMNI_OPS_STORY_MODE === 'CHAPTER1') {
+        console.log('[World] Using OMNI-OPS Chapter 1 start room (sandbox disabled)');
+        if (typeof window.waitForChapter1GameReady === 'function') {
+            window.waitForChapter1GameReady(() => {
+                console.log('[Chapter1] Using Chapter 1 corridor; sandbox disabled');
+                const roomCreated = typeof window.createChapter1StartRoom === 'function'
+                    ? window.createChapter1StartRoom(window.scene)
+                    : false;
+
+                if (roomCreated) {
+                    const spawnSet = typeof window.setChapter1PlayerSpawn === 'function'
+                        ? window.setChapter1PlayerSpawn(window.player, window.cameraRig)
+                        : false;
+
+                    if (spawnSet) {
+                        // Explicit story startup - orchestrates objectives and VO with clear logging
+                        if (typeof window.initializeChapter1Story === 'function') {
+                            window.initializeChapter1Story();
+                        } else {
+                            console.error('[World] Story initialization function not available');
+                        }
+                    }
+                }
+            });
+        } else {
+            console.error('[World] Chapter 1 integration not ready (waitForChapter1GameReady missing)');
+        }
+    } else {
+        console.log('[World] Using legacy sandbox world');
     }
 }
 
@@ -302,6 +359,9 @@ function launchGame() {
         initGame();
         console.log('[launchGame] Setting isGameActive = true');
         isGameActive = true;
+        if (!isMultiplayer) {
+            onSinglePlayerWorldReady();
+        }
         safeRequestPointerLock();
         console.log('[launchGame] Complete - game should now be playable');
     } catch(err) {
@@ -612,8 +672,9 @@ async function quitToMenu() {
 window.initializeUI = function() {
     console.log('[Core Game] initializeUI called');
     
-    // Initialize story system
-    if (window.GameStory) {
+    // Initialize story system (LEGACY - Albion story)
+    const LEGACY_ALBION = false; // Set to true to enable old "Heroes of Albion" story
+    if (LEGACY_ALBION && window.GameStory) {
         window.GameStory.init();
     }
     
@@ -628,9 +689,30 @@ window.initializeUI = function() {
         };
 
     bindBtn('btn-story-start', () => {
-        console.log('[UI] btn-story-start clicked');
-        if (window.GameStory) {
-            window.GameStory.startIntro();
+        console.log('[UI] ===== START CHAPTER 1 BUTTON CLICKED =====');
+        window.OMNI_OPS_STORY_MODE = 'CHAPTER1';
+        singlePlayerWorldReadyHandled = false;
+        
+        // Hide menu and show game UI
+        const menuOverlay = document.getElementById('menu-overlay');
+        const uiLayer = document.getElementById('ui-layer');
+        if (menuOverlay) menuOverlay.style.display = 'none';
+        if (uiLayer) uiLayer.style.display = 'flex';
+        
+        // Initialize core game world if not already active
+        if (!window.isGameActive) {
+            console.log('[UI] Game not active - initializing core world...');
+            // Set single-player flags
+            isMultiplayer = false;
+            isHost = true;
+            myPlayerIndex = 0;
+            lobbySlots[0] = "LOCAL_PLAYER";
+            
+            // Call launchGame which creates scene, renderer, camera, player
+            launchGame();
+        } else {
+            console.log('[UI] Game already active');
+            onSinglePlayerWorldReady();
         }
     });
     bindBtn('btn-single', () => {
@@ -1238,6 +1320,10 @@ function handleNetworkData(data, senderId) {
 
 // --- WORLD GENERATION (ZONAL) ---
 function generateWorld(seed) {
+    if (window.OMNI_OPS_STORY_MODE === 'CHAPTER1') {
+        console.log('[World] Skipping generateWorld for Chapter 1 story mode');
+        return;
+    }
     objects.forEach(obj => scene.remove(obj));
     objects = [];
     
@@ -1694,6 +1780,10 @@ window.createAIUnit = function(x, z, faction) {
 };
 
 function spawnAIUnits() {
+    if (window.OMNI_OPS_STORY_MODE === 'CHAPTER1') {
+        console.log('[World] Skipping spawnAIUnits for Chapter 1 story mode');
+        return;
+    }
     const offsets = [
         {x:2, z:12}, {x:-2, z:12}, {x:2, z:14}, {x:-2, z:14}, 
         {x:2, z:-12}, {x:-2, z:-12}, {x:2, z:-14}, {x:-2, z:-14}, 
@@ -1737,6 +1827,10 @@ function spawnAIUnits() {
 }
 
 function spawnZoneNPCs() {
+    if (window.OMNI_OPS_STORY_MODE === 'CHAPTER1') {
+        console.log('[World] Skipping spawnZoneNPCs for Chapter 1 story mode');
+        return;
+    }
     for(let i=0; i<3; i++) createNPC({x: 0 + (Math.random()-0.5)*5, z: -25 + (Math.random()-0.5)*5}, FACTIONS.CITIZEN, 0xffffff, JOBS.MEDIC);
     for(let i=0; i<3; i++) createNPC({x: 0 + (Math.random()-0.5)*5, z: 25 + (Math.random()-0.5)*5}, FACTIONS.CITIZEN, 0x553311, JOBS.SMITH);
     for(let i=0; i<8; i++) {
@@ -2994,6 +3088,87 @@ window.AIPlayerAPI = {
             isOnGround: player.onGround,
             reputation: gameState.reputation
         };
+    },
+    _waitForCondition(conditionFn, timeoutMs = 10000, intervalMs = 100) {
+        return new Promise((resolve) => {
+            const startTime = Date.now();
+            const check = () => {
+                let passed = false;
+                try {
+                    passed = !!conditionFn();
+                } catch (err) {
+                    passed = false;
+                }
+                if (passed) return resolve(true);
+                if (Date.now() - startTime >= timeoutMs) return resolve(false);
+                setTimeout(check, intervalMs);
+            };
+            check();
+        });
+    },
+    spawnTestBotAt(x, y, z) {
+        if (!isGameActive) return { success: false, error: 'Game not active' };
+        if (typeof window.createAIUnit !== 'function') return { success: false, error: 'createAIUnit not available' };
+        const unit = window.createAIUnit(x, z, FACTIONS.CITIZEN);
+        if (!unit || !unit.mesh) return { success: false, error: 'AI unit spawn failed' };
+        if (typeof y === 'number') unit.mesh.position.y = y;
+        return { success: true, id: unit.id, position: { x, y: unit.mesh.position.y, z } };
+    },
+    runPathTest(routeId) {
+        if (!routeId) return { success: false, error: 'routeId required' };
+        const routes = window.OmniOpsChapter1Data?.pathRoutes || window.OmniOpsChapter1Data?.routes || null;
+        if (!routes || !routes[routeId]) {
+            return { success: false, error: 'route not found', routeId };
+        }
+        return { success: false, error: 'route execution not implemented', routeId };
+    },
+    async runStoryStartupSmokeTest(options = {}) {
+        const result = { ok: true, checks: [], meta: {} };
+        const addCheck = (name, passed, details) => {
+            result.checks.push({ name, passed: !!passed, details: details || '' });
+            if (!passed) result.ok = false;
+        };
+
+        const startButton = document.getElementById('btn-story-start');
+        if (!startButton) {
+            addCheck('Start button exists', false, 'btn-story-start not found');
+            return result;
+        }
+
+        startButton.click();
+
+        const ready = await this._waitForCondition(() => window.isGameActive && window.scene && window.cameraRig && window.THREE, options.timeoutMs || 10000, 100);
+        addCheck('Engine boot (scene/camera/cameraRig)', ready, ready ? 'Ready' : 'Timed out');
+        if (!ready) return result;
+
+        const hasChapterRoom = !!window.scene?.children?.some(child => child?.userData?.type === 'chapter1_room');
+        addCheck('Chapter 1 corridor present', hasChapterRoom, hasChapterRoom ? 'chapter1_room meshes found' : 'No chapter1_room meshes');
+
+        const storyModeOk = window.OMNI_OPS_STORY_MODE === 'CHAPTER1';
+        addCheck('Story mode is CHAPTER1', storyModeOk, window.OMNI_OPS_STORY_MODE || 'unset');
+
+        const pos = window.cameraRig?.position;
+        const inCorridor = !!pos && pos.x >= -10 && pos.x <= 10 && pos.z >= 0 && pos.z <= 80;
+        addCheck('Player in corridor bounds', inCorridor, pos ? `(${pos.x.toFixed(2)}, ${pos.y.toFixed(2)}, ${pos.z.toFixed(2)})` : 'No cameraRig position');
+
+        const hasTerrain = !!window.scene?.children?.some(child => child?.userData?.type === 'terrain');
+        addCheck('Sandbox terrain not present', !hasTerrain, hasTerrain ? 'terrain found' : 'no terrain');
+
+        const ariaStatus = window.AriaVoRouter?.getStatus ? window.AriaVoRouter.getStatus() : null;
+        const ariaPlayed = window.AriaVoRouter?.lastPlayedLine === 'ARIA_C1_001' || ariaStatus?.currentLine === 'ARIA_C1_001';
+        addCheck('ARIA intro VO fired', ariaPlayed, ariaPlayed ? 'ARIA_C1_001' : 'Not detected');
+
+        const currentObj = window.OmniOpsChapter1?.getCurrentObjective?.();
+        const objectiveOk = currentObj?.id === 'OBJ_C1_WAKE';
+        addCheck('First objective is OBJ_C1_WAKE', objectiveOk, currentObj?.id || 'Objective missing');
+
+        result.meta = {
+            storyMode: window.OMNI_OPS_STORY_MODE || 'unknown',
+            objectiveId: currentObj?.id || null,
+            ariaLine: window.AriaVoRouter?.lastPlayedLine || ariaStatus?.currentLine || null
+        };
+
+        return result;
     }
 };
 
@@ -3136,6 +3311,10 @@ setInterval(() => {
 }, 500);
 
 console.log('[Core Game] v11 loaded successfully');
+
+// AUTO-FEATURE [real_edit]: real edit
+console.log('[Feature] Loaded: real edit');
+
 
 // AUTO-FEATURE [i_want_you_to_bind_g]: I want you to bind G to spectator mode and have spectator mode allow me to noclip and fly 
 console.log('[Feature] Loaded: I want you to bind G to spectator mode and have spectator mode allow me to noclip and fly ');

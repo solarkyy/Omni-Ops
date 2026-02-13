@@ -11,14 +11,18 @@ import json
 import time
 import threading
 import subprocess
+from urllib import request as urlrequest
+from urllib.error import URLError, HTTPError
 from pathlib import Path
-from flask import Flask, jsonify, send_from_directory, send_file, request
+from flask import Flask, jsonify, send_from_directory, send_file, request, Response, redirect
 from flask_cors import CORS, cross_origin
 
 # Configuration
 WORKSPACE_DIR = Path(__file__).parent
 PORT = 8080
 HOST = '127.0.0.1'
+OPS_CONSOLE_DIR = WORKSPACE_DIR / 'ops-console' / 'client'
+OPS_CONSOLE_SERVER = os.environ.get('OPS_CONSOLE_SERVER', 'http://127.0.0.1:3000')
 
 app = Flask(__name__, static_folder=str(WORKSPACE_DIR))
 CORS(app)
@@ -518,10 +522,88 @@ def get_messages():
         pass
     return messages
 
+def proxy_ops_console_request(path):
+    """
+    Proxy Ops Console API requests to the Node backend.
+
+    Run instructions (dev):
+      1) Start the game server: python local_http_server.py
+      2) Start Ops Console API server: cd ops-console && npm start
+      3) Open http://127.0.0.1:8080/ (game)
+      4) Open http://127.0.0.1:8080/ops-console/ (console)
+    """
+    url = f"{OPS_CONSOLE_SERVER}{path}"
+    if request.query_string:
+        url += "?" + request.query_string.decode('utf-8')
+
+    data = request.get_data() if request.method in ['POST', 'PUT', 'PATCH'] else None
+    headers = {}
+    content_type = request.headers.get('Content-Type')
+    if content_type:
+        headers['Content-Type'] = content_type
+
+    try:
+        req = urlrequest.Request(url, data=data, headers=headers, method=request.method)
+        with urlrequest.urlopen(req, timeout=5) as resp:
+            body = resp.read()
+            proxied_type = resp.headers.get('Content-Type', 'application/json')
+            return Response(body, status=resp.status, content_type=proxied_type)
+    except HTTPError as e:
+        return Response(e.read(), status=e.code, content_type='application/json')
+    except URLError as e:
+        return jsonify({
+            'error': 'Ops Console backend unavailable',
+            'details': str(e)
+        }), 502
+    except Exception as e:
+        return jsonify({
+            'error': 'Ops Console proxy error',
+            'details': str(e)
+        }), 502
+
 @app.route('/')
 def index():
     """Serve main game"""
     return send_file(WORKSPACE_DIR / 'index.html')
+
+@app.route('/ops-console/')
+@app.route('/ops-console')
+@app.route('/ops-console/<path:filepath>')
+def ops_console_files(filepath='index.html'):
+    """Serve Ops Console UI from the same origin"""
+    if request.path == '/ops-console':
+        return redirect('/ops-console/')
+    if not OPS_CONSOLE_DIR.exists():
+        return 'Ops Console not found', 404
+    return send_from_directory(OPS_CONSOLE_DIR, filepath)
+
+@app.route('/status', methods=['GET'])
+def ops_console_status():
+    return proxy_ops_console_request('/status')
+
+@app.route('/snapshot', methods=['GET'])
+def ops_console_snapshot():
+    return proxy_ops_console_request('/snapshot')
+
+@app.route('/tests', methods=['GET'])
+def ops_console_tests():
+    return proxy_ops_console_request('/tests')
+
+@app.route('/last-test', methods=['GET'])
+def ops_console_last_test():
+    return proxy_ops_console_request('/last-test')
+
+@app.route('/run-test', methods=['POST'])
+def ops_console_run_test():
+    return proxy_ops_console_request('/run-test')
+
+@app.route('/chat', methods=['POST'])
+def ops_console_chat():
+    return proxy_ops_console_request('/chat')
+
+@app.route('/command', methods=['POST'])
+def ops_console_command():
+    return proxy_ops_console_request('/command')
 
 @app.route('/<path:filepath>')
 def serve_files(filepath):

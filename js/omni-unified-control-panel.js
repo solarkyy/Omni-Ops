@@ -98,20 +98,31 @@ window.OmniUnifiedPanel = {
                             <button class="panel-btn" style="width:48%;margin:2px;background:rgba(0,255,0,0.1);border-color:#0f0;color:#0f0;" onclick="window.OmniUnifiedPanel.toggleAI(true)">▶️ Activate</button>
                             <button class="panel-btn" style="width:48%;margin:2px;background:rgba(255,0,0,0.1);border-color:#f00;color:#f00;" onclick="window.OmniUnifiedPanel.toggleAI(false)">⏹️ Stop</button>
                             <h4 style="margin:15px 0 10px;color:#0f6;">AI Controls</h4>
-                            <button class="panel-btn" style="width:100%;margin:5px 0;" onclick="window.OmniUnifiedPanel.aiCommand('forward')">Move Forward</button>
-                            <button class="panel-btn" style="width:100%;margin:5px 0;" onclick="window.OmniUnifiedPanel.aiCommand('patrol')">Auto Patrol</button>
-                            <button class="panel-btn" style="width:100%;margin:5px 0;" onclick="window.OmniUnifiedPanel.aiCommand('engage')">Auto Engage</button>
+                            <button class="panel-btn" style="width:100%;margin:5px 0;" onclick="window.OmniUnifiedPanel.aiCommand('patrol_area')">Auto Patrol</button>
+                            <button class="panel-btn" style="width:100%;margin:5px 0;" onclick="window.OmniUnifiedPanel.aiCommand('seek_enemies')">Auto Engage</button>
+                            <button class="panel-btn" style="width:100%;margin:5px 0;" onclick="window.OmniUnifiedPanel.aiCommand('hold_position')">Hold Position</button>
+                            <button class="panel-btn" style="width:100%;margin:5px 0;" onclick="window.OmniUnifiedPanel.aiCommand('return_to_safe_zone')">Return to Base</button>
                             <h4 style="margin:15px 0 10px;color:#0f6;">AI Dev Command</h4>
                             <input id="ai-command-input" type="text" placeholder="e.g., explore area y" style="width:100%;background:#111;border:1px solid #0f6;color:#0f6;padding:6px;border-radius:3px;font-family:monospace;font-size:11px;margin-bottom:6px;" />
                             <div style="display:flex;gap:6px;">
                                 <button class="panel-btn" style="flex:1;" onclick="window.OmniUnifiedPanel.sendAICommandFromInput()">Send</button>
                                 <button class="panel-btn" style="flex:1;" onclick="window.OmniUnifiedPanel.aiCommand('status')">Status</button>
                             </div>
+                            <button class="panel-btn" style="width:100%;margin:6px 0 0;background:rgba(100,200,255,0.1);border-color:#64c8ff;color:#64c8ff;" onclick="window.OmniUnifiedPanel.aiCommand('explain_last_decision')">Why last decision?</button>
+                            <h4 style="margin:15px 0 10px;color:#0f6;">Last Decision</h4>
+                            <div id="ai-last-decision" style="max-height:70px;overflow:hidden;font-size:11px;background:rgba(0,0,0,0.3);border:1px solid #333;border-radius:3px;padding:6px;color:#aaa;">Waiting for a decision...</div>
                             <h4 style="margin:15px 0 10px;color:#0f6;">Agent Bridge</h4>
                             <button class="panel-btn" style="width:100%;margin:5px 0;background:rgba(100,200,255,0.1);border-color:#64c8ff;color:#64c8ff;" onclick="window.OmniUnifiedPanel.copySnapshot()">📋 Copy Snapshot</button>
                             <div id="snapshot-status" style="font-size:10px;color:#0f6;margin-top:4px;padding:4px;background:rgba(0,0,0,0.3);border-radius:2px;text-align:center;display:none;">Snapshot copied!</div>
                             <h4 style="margin:15px 0 10px;color:#0f6;">AI Dev Log</h4>
                             <div id="ai-dev-log" style="max-height:140px;overflow-y:auto;font-size:11px;background:rgba(0,0,0,0.3);border:1px solid #333;border-radius:3px;padding:6px;">Waiting for thoughts...</div>
+                            <h4 style="margin:15px 0 10px;color:#0f6;">AI Behavior Patches</h4>
+                            <div id="ai-patches-container" style="max-height:200px;overflow-y:auto;font-size:10px;background:rgba(0,0,0,0.3);border:1px solid #333;border-radius:3px;padding:6px;">
+                                <div id="ai-patches-list">No pending patches</div>
+                                <div id="ai-patches-stats" style="margin-top:8px;padding-top:8px;border-top:1px solid #333;color:#888;">
+                                    Applied: <span id="patches-applied">0</span> | Rejected: <span id="patches-rejected">0</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     
@@ -255,7 +266,129 @@ window.OmniUnifiedPanel = {
                 document.getElementById('ai-status-dot').style.background = '#f00';
                 document.getElementById('ai-status-text').textContent = 'AI Not Active';
             }
+
+            // Update behavior patches UI
+            this.updatePatchesUI();
+            this.updateDecisionSummary();
         }, 100);
+    },
+
+    /**
+     * Update the behavior patches UI section
+     */
+    updatePatchesUI() {
+        if (!window.AIBehaviorPatches) return;
+
+        const patchesList = document.getElementById('ai-patches-list');
+        const appliedEl = document.getElementById('patches-applied');
+        const rejectedEl = document.getElementById('patches-rejected');
+
+        if (!patchesList || !appliedEl || !rejectedEl) return;
+
+        const stats = window.AIBehaviorPatches.stats();
+        const pending = window.AIBehaviorPatches.list('pending');
+
+        // Update stats
+        appliedEl.textContent = stats.approved;
+        rejectedEl.textContent = stats.rejected;
+
+        // Update patches list
+        if (pending.length === 0) {
+            patchesList.innerHTML = '<div style="color:#888;text-align:center;padding:10px;">No pending patches</div>';
+        } else {
+            patchesList.innerHTML = pending.map(patch => `
+                <div style="background:rgba(0,255,102,0.05);border:1px solid rgba(0,255,102,0.2);padding:6px;margin:4px 0;border-radius:3px;">
+                    <div style="font-weight:bold;color:#0f6;margin-bottom:3px;">${patch.featureId}</div>
+                    <div style="color:#aaa;font-size:9px;margin-bottom:4px;">${patch.summary}</div>
+                    <div style="color:#888;font-size:9px;margin-bottom:4px;">
+                        Target: ${patch.targetFile || 'unspecified'} | Size: ${patch.codeLength} chars
+                    </div>
+                    <div style="display:flex;gap:4px;">
+                        <button onclick="window.OmniUnifiedPanel.applyPatch('${patch.id}')" 
+                                style="flex:1;padding:4px;background:rgba(0,255,0,0.2);border:1px solid #0f0;color:#0f0;border-radius:2px;cursor:pointer;font-size:9px;font-weight:bold;">
+                            ✓ Apply
+                        </button>
+                        <button onclick="window.OmniUnifiedPanel.rejectPatch('${patch.id}')" 
+                                style="flex:1;padding:4px;background:rgba(255,0,0,0.2);border:1px solid #f00;color:#f00;border-radius:2px;cursor:pointer;font-size:9px;font-weight:bold;">
+                            ✗ Reject
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+    },
+
+    updateDecisionSummary() {
+        const panel = document.getElementById('ai-last-decision');
+        if (!panel || !window.AgentBridge) return;
+
+        const now = Date.now();
+        if (this._lastDecisionPollAt && now - this._lastDecisionPollAt < 1000) return;
+        this._lastDecisionPollAt = now;
+
+        let summary = null;
+        try {
+            summary = window.AgentBridge.exportSnapshot()?.decisionSummary || null;
+        } catch (err) {
+            summary = null;
+        }
+
+        if (!summary) {
+            panel.textContent = 'No decision yet';
+            return;
+        }
+
+        const maxLen = 180;
+        panel.textContent = summary.length > maxLen
+            ? `${summary.slice(0, maxLen - 3)}...`
+            : summary;
+    },
+
+    /**
+     * Apply a behavior patch
+     */
+    applyPatch(patchId) {
+        if (!window.AIBehaviorPatches) {
+            alert('AIBehaviorPatches not loaded!');
+            return;
+        }
+
+        const result = window.AIBehaviorPatches.apply(patchId);
+        
+        if (result.ok) {
+            console.log('[Panel] Patch applied:', patchId);
+            this.showSuccessMessage(`Patch "${patchId}" applied`);
+        } else {
+            console.error('[Panel] Failed to apply patch:', result.message);
+            this.showErrorMessage(result.message);
+        }
+
+        // Force update UI
+        this.updatePatchesUI();
+    },
+
+    /**
+     * Reject a behavior patch
+     */
+    rejectPatch(patchId) {
+        if (!window.AIBehaviorPatches) {
+            alert('AIBehaviorPatches not loaded!');
+            return;
+        }
+
+        const reason = prompt('Reason for rejection (optional):') || 'Human decision';
+        const result = window.AIBehaviorPatches.reject(patchId, reason);
+        
+        if (result.ok) {
+            console.log('[Panel] Patch rejected:', patchId);
+            this.showSuccessMessage(`Patch "${patchId}" rejected`);
+        } else {
+            console.error('[Panel] Failed to reject patch:', result.message);
+            this.showErrorMessage(result.message);
+        }
+
+        // Force update UI
+        this.updatePatchesUI();
     },
     
     testMove(direction) {
@@ -343,6 +476,15 @@ window.OmniUnifiedPanel = {
                     this.showErrorMessage('AI API failed to initialize. Check console.');
                 }
             });
+            return;
+        }
+
+        if (window.AgentBridge && typeof window.AgentBridge.enqueueCommand === 'function') {
+            const result = window.AgentBridge.enqueueCommand(cmd);
+            if (result?.ok === false) {
+                this.showErrorMessage(result.message || 'Command rejected by AgentBridge');
+            }
+            console.log(`[Panel] AI Command routed via AgentBridge: ${cmd}`);
             return;
         }
 

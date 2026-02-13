@@ -131,6 +131,58 @@ window.AIGameBridgeAPI = {
             return { success: false, error: e.message };
         }
     },
+
+    /**
+     * Spawn a test bot at a position
+     */
+    handleSpawnTestBotAt(x, y, z) {
+        if (!window.AIPlayerAPI || typeof window.AIPlayerAPI.spawnTestBotAt !== 'function') {
+            return { success: false, error: 'AIPlayerAPI.spawnTestBotAt not available' };
+        }
+        try {
+            const result = window.AIPlayerAPI.spawnTestBotAt(x, y, z);
+            console.log('[AI Bridge] spawnTestBotAt', result);
+            return result;
+        } catch (e) {
+            console.error('[AI Bridge] spawnTestBotAt error:', e);
+            return { success: false, error: e.message };
+        }
+    },
+
+    /**
+     * Run a path test by routeId
+     */
+    handleRunPathTest(routeId) {
+        if (!window.AIPlayerAPI || typeof window.AIPlayerAPI.runPathTest !== 'function') {
+            return { success: false, error: 'AIPlayerAPI.runPathTest not available' };
+        }
+        try {
+            const result = window.AIPlayerAPI.runPathTest(routeId);
+            console.log('[AI Bridge] runPathTest', result);
+            return result;
+        } catch (e) {
+            console.error('[AI Bridge] runPathTest error:', e);
+            return { success: false, error: e.message };
+        }
+    },
+
+    /**
+     * Run Chapter 1 story startup smoke test
+     */
+    handleRunStoryStartupSmokeTest(options = {}) {
+        if (!window.AIPlayerAPI || typeof window.AIPlayerAPI.runStoryStartupSmokeTest !== 'function') {
+            return { success: false, error: 'AIPlayerAPI.runStoryStartupSmokeTest not available' };
+        }
+        return window.AIPlayerAPI.runStoryStartupSmokeTest(options)
+            .then((result) => {
+                console.log('[AI Bridge] runStoryStartupSmokeTest', result);
+                return result;
+            })
+            .catch((e) => {
+                console.error('[AI Bridge] runStoryStartupSmokeTest error:', e);
+                return { success: false, error: e.message };
+            });
+    },
     
     /**
      * Check if AI is controlling

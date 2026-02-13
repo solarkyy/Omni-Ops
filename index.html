@@ -73,8 +73,8 @@
     <div id="menu-overlay">
         <div id="main-screen" class="menu-screen active">
             <div class="menu-title">⚡ OMNI-OPS</div>
-            <div class="menu-subtitle">THE HEROES OF ALBION</div>
-            <button id="btn-story-start" class="menu-btn">📖 Start Story</button>
+            <div class="menu-subtitle">CHAPTER 1: COLD BOOT</div>
+            <button id="btn-story-start" class="menu-btn">📖 Start Chapter 1</button>
             <button id="btn-single" class="menu-btn">🎮 Quick Play</button>
             <button id="btn-show-host" class="menu-btn">🌐 New Game (Host)</button>
             <button id="btn-show-join" class="menu-btn">🔗 Join Game</button>
@@ -126,6 +126,12 @@
             <div id="world-clock" style="margin-top:10px;">00:00</div>
             <div id="connection-status"></div>
             <div id="game-status" style="color:#0f0; margin-top:10px; font-weight:bold;">GAME ACTIVE</div>
+            <!-- OMNI-OPS OBJECTIVE DISPLAY -->
+            <div id="omni-objective-container" style="margin-top:20px; padding:10px; background:rgba(0,0,0,0.8); border:1px solid #0f6; border-radius:5px; max-width:400px;">
+                <div style="color:#00ffcc; font-size:11px; margin-bottom:5px; font-weight:bold;">CURRENT OBJECTIVE</div>
+                <div id="omni-objective-text" style="color:#0f6; font-size:14px; font-weight:bold;"></div>
+                <div id="omni-quest-log-text" style="color:#0f6; font-size:11px; margin-top:8px; opacity:0.8; line-height:1.4;"></div>
+            </div>
         </div>
         <div id="hud-bottom">
             <div id="hud-ammo">Ammo: <span id="ammo-cur">30</span> / <span id="ammo-res">90</span></div>
@@ -160,6 +166,18 @@
         <!-- HIT MARKER -->
         <div id="hitmarker" style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); width:40px; height:40px; border:2px solid #0f0; border-radius:50%; opacity:0; pointer-events:none; transition:opacity 0.1s;"></div>
         
+        <!-- OMNI-OPS: ARIA SUBTITLE DISPLAY -->
+        <div id="aria-subtitle" style="position:absolute; bottom:180px; left:50%; transform:translateX(-50%); width:700px; padding:15px 25px; background:rgba(0,0,0,0.85); border:2px solid #00ffcc; border-radius:8px; color:#00ffcc; font-size:15px; text-align:center; display:none; z-index:300; box-shadow:0 0 20px rgba(0,255,204,0.3);">
+            <div style="color:#ffcc00; font-size:11px; margin-bottom:5px; font-weight:bold;">▼ ARIA</div>
+        </div>
+        
+        <!-- OMNI-OPS: TUTORIAL DISPLAY -->
+        <div id="omni-tutorial" style="position:absolute; top:150px; right:30px; width:350px; padding:15px; background:rgba(0,0,0,0.9); border:2px solid #0f6; border-radius:8px; display:none; z-index:250;">
+            <div class="tutorial-title" style="color:#ffcc00; font-size:13px; font-weight:bold; margin-bottom:8px; text-transform:uppercase;"></div>
+            <div class="tutorial-body" style="color:#0f6; font-size:12px; line-height:1.5;"></div>
+            <div style="color:#0f6; font-size:10px; margin-top:10px; opacity:0.6; text-align:right;">Press ESC to dismiss</div>
+        </div>
+        
         <!-- HUD CONTAINERS -->
         <div id="health-container" style="position:absolute; bottom:20px; left:20px; color:#0f6; font-size:14px;">
             <div>HP: <span id="hud-health-value">100</span>/100</div>
@@ -191,6 +209,21 @@
             <canvas id="minimap-canvas" style="width:100%; height:100%;"></canvas>
         </div>
     </div>
+
+    <button id="open-ops-console" style="position:fixed; top:10px; right:10px; z-index:6000; background:#0f6; color:#000; border:none; padding:8px 12px; font-weight:bold; font-family:monospace; border-radius:4px; cursor:pointer; pointer-events:auto;">
+        OPS CONSOLE
+    </button>
+
+    <script>
+        window.addEventListener('DOMContentLoaded', () => {
+            const button = document.getElementById('open-ops-console');
+            if (button) {
+                button.addEventListener('click', () => {
+                    window.open('/ops-console/', '_blank');
+                });
+            }
+        });
+    </script>
 
     <div id="version-indicator">
         PHASE 7 ULTIMATE - Press F2 for Editor
@@ -327,6 +360,12 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    
+    <!-- OMNI-OPS: Chapter 1 System -->
+    <script src="js/omni-ops-data-chapter1.js" defer></script>
+    <script src="js/omni-ops-aria-vo.js" defer></script>
+    <script src="js/omni-ops-chapter1.js" defer></script>
+    <script src="js/omni-ops-chapter1-integration.js" defer></script>
     <script>
         // Global logging to page for debugging
         window.pageLog = [];
@@ -364,7 +403,12 @@
     <script src="js/omni-unified-control-panel.js" defer></script>
     <script src="js/omni-ai-npc-intelligence.js" defer></script>
     <script src="ai/IntelligentAgent.js" defer></script>
+    <script src="ai/BehaviorPatchManager.js" defer></script>
     <script src="ai/AgentBridge.js" defer></script>
+    <!-- HIGH: AI Worker API - Convenience wrapper for IDE/Copilot integration -->
+    <script src="ai/ai_worker_api.js" defer></script>
+    <!-- TEST HARNESS - Minimal MVP for automated testing (console/external tools only) -->
+    <script src="ai/ai_test_harness.js" defer></script>
     <script>
         // Auto-run diagnostics after game loads (optional - user can call manually)
         window.addEventListener('load', () => {

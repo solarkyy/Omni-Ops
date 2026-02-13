@@ -1,7 +1,18 @@
 (function() {
     'use strict';
 
-    // ====== STORY & WORLD INTEGRATION ======
+    // ====== LEGACY: STORY & WORLD INTEGRATION ======
+    // DEPRECATED: This integrates the old "Heroes of Albion" story with the world
+    // OMNI-OPS Chapter 1 has its own integration system
+    // This file is disabled by default
+    
+    const LEGACY_ALBION = false; // Set to true to enable old Albion story integration
+    
+    if (!LEGACY_ALBION) {
+        console.log('[Story Integration] LEGACY_ALBION disabled - skipping Albion story integration');
+        return;
+    }
+
     // Hooks story events to living world NPCs and game mechanics
 
     const StoryIntegration = {

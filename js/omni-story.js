@@ -1,8 +1,10 @@
 (function() {
     'use strict';
 
-    // ====== FABLE-STYLE STORY & NARRATIVE SYSTEM ======
-    // Immersive world narrative with character-driven plot and emotional arcs
+    // ====== LEGACY: FABLE-STYLE STORY & NARRATIVE SYSTEM ======
+    // DEPRECATED: This is the original "Heroes of Albion" story mode
+    // OMNI-OPS Chapter 1 is now the active story mode
+    // Set LEGACY_ALBION = true in omni-core-game.js to re-enable this story
 
     const StoryState = {
         INTRO_STARTED: 'INTRO_STARTED',

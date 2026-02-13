@@ -101,7 +101,12 @@ const ModuleLoader = {
         document.getElementById('loading-bar').style.width = percent + '%';
     },
     updateStatus: function (text) {
-        document.getElementById('loading-status').textContent = text;
+        const statusEl = document.getElementById('loading-status');
+        if (statusEl) {
+            statusEl.textContent = text;
+        } else {
+            console.warn('[ModuleLoader] Loading status element not found, queueing message:', text);
+        }
     },
     complete: function () {
         this.updateStatus('All systems ready!');
@@ -186,7 +191,37 @@ const ModuleLoader = {
         }, 500);
     }
 };
-window.addEventListener('load', () => ModuleLoader.init());
+// Initialize ModuleLoader when DOM is ready (handle both timing scenarios)
+function initializeModuleLoader() {
+    if (document.readyState === 'loading') {
+        // Still loading HTML - wait for DOMContentLoaded
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('[ModuleLoader] DOM loaded, initializing...');
+            ModuleLoader.init();
+        });
+    } else {
+        // HTML already parsed - initialize immediately
+        console.log('[ModuleLoader] DOM ready, initializing immediately...');
+        ModuleLoader.init();
+    }
+}
+
+// Ensure we initialize even if load event already fired
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeModuleLoader);
+} else {
+    // If page is already interactive or complete, init immediately
+    setTimeout(initializeModuleLoader, 0);
+}
+
+// Fallback: Also attach to load event in case page hasn't loaded yet
+window.addEventListener('load', () => {
+    if (!window.modulesLoaded) {
+        console.log('[ModuleLoader] Page load event fired, initializing if not already done...');
+        if (!ModuleLoader.modules[0]) return; // Already running
+        // ModuleLoader.init();
+    }
+});
 
 // Global error handler to catch any uncaught errors
 window.addEventListener('error', (event) => {
