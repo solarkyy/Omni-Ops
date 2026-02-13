@@ -269,23 +269,115 @@
         let initCheckAttempts = 0;
         const checkReady = () => {
             initCheckAttempts++;
+            
+            // ✅ TASK 2: Check for Global Window Objects (Linker Fix)
             const isReady = window.isGameActive && window.scene && window.cameraRig && window.THREE;
+            
+            // Enhanced logging for debugging
+            if (initCheckAttempts === 1 || initCheckAttempts % 10 === 0) {
+                console.log('[Chapter 1 Integration] Checking ready state (attempt ' + initCheckAttempts + '):', {
+                    isGameActive: !!window.isGameActive,
+                    scene: !!window.scene,
+                    cameraRig: !!window.cameraRig,
+                    THREE: !!window.THREE
+                });
+            }
 
             if (isReady) {
-                console.log('[Chapter 1 Integration] ✓ Game is ready (isGameActive, scene, cameraRig, THREE all exist)');
+                console.log('[Chapter 1 Integration] ✅✅✅ SUCCESS: Core systems found. Waking up story... ✅✅✅');
                 console.log('[Chapter 1 Integration] Took', initCheckAttempts * 100, 'ms to become ready');
+                console.log('[Chapter 1 Integration] Ready state:', {
+                    isGameActive: window.isGameActive,
+                    scene: !!window.scene,
+                    cameraRig: !!window.cameraRig,
+                    camera: !!window.camera,
+                    THREE: !!window.THREE,
+                    playerRigPosition: window.cameraRig ? window.cameraRig.position : null
+                });
+                
+                // ✅ ACTIVATE DORMANT STRUCTURES
+                
+                // --- UI SAFETY NET (Prevents InnerText Crash) ---
+                if (!document.getElementById('story-overlay')) {
+                    console.log('[UI Fix] 🔧 Injecting missing Story Overlay...');
+                    
+                    // 1. Create the Main Container
+                    const overlay = document.createElement('div');
+                    overlay.id = 'story-overlay';
+                    Object.assign(overlay.style, {
+                        position: 'absolute', top: '20%', left: '50%', transform: 'translate(-50%, 0)',
+                        width: '600px', padding: '20px', background: 'rgba(0, 20, 0, 0.8)',
+                        border: '2px solid #00ff00', color: '#00ff00', fontFamily: 'monospace',
+                        fontSize: '18px', textAlign: 'center', zIndex: '9999', pointerEvents: 'none',
+                        display: 'none' // Hidden by default, shown by story
+                    });
+                    
+                    // 2. Create the Text Element (The one causing the crash)
+                    const textElem = document.createElement('div');
+                    textElem.id = 'intro-text'; // Common ID used by story modules
+                    overlay.appendChild(textElem);
+                    
+                    // 3. Create a Subtitle Element (Just in case)
+                    const subElem = document.createElement('div');
+                    subElem.id = 'subtitle-box';
+                    overlay.appendChild(subElem);
+                    
+                    document.body.appendChild(overlay);
+                    console.log('[UI Fix] ✅ Story Overlay created:', overlay.id);
+                } else {
+                    console.log('[UI Fix] ✅ Story Overlay already exists');
+                }
+                // --- END UI SAFETY NET ---
+                
+                if (window.GameStory && window.GameStory.startIntro) {
+                    console.log('[Chapter 1 Integration] 🎬 Triggering GameStory.startIntro()...');
+                    try {
+                        window.GameStory.startIntro();
+                        console.log('[Chapter 1 Integration] ✅ GameStory.startIntro() executed successfully');
+                    } catch (e) {
+                        console.warn('[Story Warning] ⚠️ UI update failed, but game is continuing:', e);
+                        // Fallback: Log the text to console if UI fails
+                        console.log('%c📖 STORY TEXT: Welcome to Omni-Ops Chapter 1', 'color: #00ff88; font-size: 14px;');
+                    }
+                } else if (window.OmniOpsChapter1 && window.OmniOpsChapter1.init) {
+                    console.log('[Chapter 1 Integration] 🎬 Starting OmniOpsChapter1 controller...');
+                    try {
+                        window.OmniOpsChapter1.init();
+                        console.log('[Chapter 1 Integration] ✅ OmniOpsChapter1.init() executed successfully');
+                    } catch (e) {
+                        console.warn('[Story Warning] ⚠️ Chapter 1 controller initialization failed, but game is continuing:', e);
+                        console.log('%c📖 STORY TEXT: Welcome to Omni-Ops Chapter 1', 'color: #00ff88; font-size: 14px;');
+                    }
+                } else {
+                    console.warn('[Chapter 1 Integration] ⚠️ GameStory module missing, using backup trigger...');
+                    // Fallback: Display welcome message
+                    console.log('%c🎮 Welcome to Omni-Ops Chapter 1 🎮', 'color: #00ff88; font-size: 16px; font-weight: bold;');
+                    
+                    // Try to show HUD message if available
+                    if (typeof updateDialogue === 'function') {
+                        updateDialogue('System Booting... Chapter 1 Active.');
+                    }
+                }
+                
                 onReady();
                 return;
             }
 
             if (initCheckAttempts >= MAX_INIT_CHECKS) {
-                console.error('[Chapter 1 Integration] ERROR: Game never reached ready state (isGameActive=' + window.isGameActive + ', scene=' + !!window.scene + ', cameraRig=' + !!window.cameraRig + ', THREE=' + !!window.THREE + ')');
+                console.error('[Chapter 1 Integration] ❌ ERROR: Game never reached ready state after ' + (MAX_INIT_CHECKS * 100) + 'ms');
+                console.error('[Chapter 1 Integration] Final state:', {
+                    isGameActive: window.isGameActive,
+                    scene: !!window.scene,
+                    cameraRig: !!window.cameraRig,
+                    THREE: !!window.THREE
+                });
                 return;
             }
 
             setTimeout(checkReady, 100);
         };
 
+        console.log('[Chapter 1 Integration] 🔍 Starting ready state polling...');
         checkReady();
     }
 
@@ -293,35 +385,90 @@
     // EXPLICIT STORY STARTUP - Chapter 1 initialization orchestration
     // ==========================================
     function initializeChapter1Story() {
-        console.log('[Story] Mode set: CHAPTER1');
+        console.log('[Story] 🎬 Mode set: CHAPTER1');
         window.OMNI_OPS_STORY_MODE = 'CHAPTER1';
 
         if (!window.OmniOpsChapter1) {
-            console.error('[Story] OmniOpsChapter1 controller not loaded!');
+            console.error('[Story] ❌ OmniOpsChapter1 controller not loaded!');
+            console.log('[Story] 💡 Using fallback story activation...');
+            
+            // ✅ TASK 3: Fallback story trigger with HUD dialogue
+            if (typeof updateDialogue === 'function') {
+                setTimeout(() => {
+                    updateDialogue('SYSTEM INITIALIZING...');
+                    console.log('[Story] 📢 HUD Dialogue triggered: SYSTEM INITIALIZING');
+                }, 500);
+                
+                setTimeout(() => {
+                    updateDialogue('NEURAL LINK ESTABLISHED.');
+                    console.log('[Story] 📢 HUD Dialogue triggered: NEURAL LINK ESTABLISHED');
+                }, 2000);
+                
+                setTimeout(() => {
+                    updateDialogue('WELCOME TO OMNI-OPS, OPERATIVE.');
+                    console.log('[Story] 📢 HUD Dialogue triggered: WELCOME MESSAGE');
+                }, 3500);
+            } else {
+                console.warn('[Story] ⚠️ updateDialogue function not available');
+            }
             return;
         }
 
         // Step 1: Initialize controller if not active
+        console.log('[Story] Checking OmniOpsChapter1.active:', window.OmniOpsChapter1.active);
         if (!window.OmniOpsChapter1.active) {
-            window.OmniOpsChapter1.init();
+            console.log('[Story] 🎮 Initializing OmniOpsChapter1 controller...');
+            try {
+                window.OmniOpsChapter1.init();
+                console.log('[Story] ✅ OmniOpsChapter1 initialized successfully');
+            } catch (e) {
+                console.error('[Story] ❌ Failed to initialize OmniOpsChapter1:', e);
+                return; // Stop if initialization fails
+            }
         }
 
         // Step 2: Explicitly start first objective
         // This ensures currentObjectiveIndex is set, HUD is updated, and ARIA VO is queued
-        window.OmniOpsChapter1.startObjective(0);
+        console.log('[Story] 🎯 Starting first objective (index 0)...');
+        try {
+            window.OmniOpsChapter1.startObjective(0);
+            console.log('[Story] ✅ First objective started');
+        } catch (e) {
+            console.error('[Story] ❌ Failed to start first objective:', e);
+            return; // Stop if objective start fails
+        }
         
         const currentObj = window.OmniOpsChapter1.getCurrentObjective();
         if (currentObj && currentObj.id === 'OBJ_C1_WAKE') {
-            console.log('[Objectives] Created and activated OBJ_C1_WAKE');
+            console.log('[Objectives] ✅ Created and activated OBJ_C1_WAKE');
+            console.log('[Objectives] Details:', {
+                id: currentObj.id,
+                description: currentObj.description,
+                voOnStart: currentObj.voOnStart
+            });
         } else {
-            console.warn('[Objectives] First objective is not OBJ_C1_WAKE');
+            console.warn('[Objectives] ⚠️ First objective is not OBJ_C1_WAKE, got:', currentObj ? currentObj.id : 'null');
         }
 
         // Step 3: Verify ARIA VO was queued (queuing happens inside startObjective via voOnStart)
-        if (window.AriaVoRouter) {
-            const ariaLineId = currentObj?.voOnStart || 'unknown';
-            console.log('[VO] Queued ' + ariaLineId);
+        if (window.AriaVoRouter && currentObj) {
+            const ariaLineId = currentObj.voOnStart || 'unknown';
+            console.log('[VO] 🔊 Queued ARIA line:', ariaLineId);
+        } else if (!window.AriaVoRouter) {
+            console.warn('[VO] ⚠️ AriaVoRouter not available');
         }
+        
+        // ✅ TASK 3: Ensure HUD dialogue triggers
+        if (typeof updateDialogue === 'function') {
+            setTimeout(() => {
+                updateDialogue('System Booting...');
+                console.log('[Story] 📢 HUD Dialogue activated');
+            }, 500);
+        } else {
+            console.warn('[Story] ⚠️ updateDialogue function not found - HUD dialogue unavailable');
+        }
+        
+        console.log('[Story] ✅ Chapter 1 story initialization complete');
     }
 
     window.createChapter1StartRoom = createChapter1StartRoom;

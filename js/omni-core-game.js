@@ -142,30 +142,67 @@ function initGame() {
         scene = new THREE.Scene();
         console.log('[World] Scene created');
         window.scene = scene;
+        
+        // --- TEMPORARY STAGING AREA (Fix for Void) ---
+        // 1. Lighting (Essential for visibility)
+        const stagingAmbient = new THREE.AmbientLight(0xffffff, 1.2); // High intensity to ensure visibility
+        scene.add(stagingAmbient);
+        
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
+        dirLight.position.set(10, 20, 10);
+        dirLight.castShadow = true;
+        scene.add(dirLight);
+        console.log('[Staging] Lighting initialized');
+        
+        // 2. The Floor (Dark Grey Matte)
+        const floorGeo = new THREE.PlaneGeometry(200, 200);
+        const floorMat = new THREE.MeshStandardMaterial({
+            color: 0x1a1a1a, // Dark grey to match UI background
+            roughness: 0.8
+        });
+        const floor = new THREE.Mesh(floorGeo, floorMat);
+        floor.rotation.x = -Math.PI / 2; // Rotate flat
+        floor.receiveShadow = true;
+        scene.add(floor);
+        console.log('[Staging] Floor created');
+        
+        // 3. The Grid (Sci-Fi Aesthetic)
+        // Size: 200, Divisions: 50, CenterLine: Neon Green, Grid: Dark Grey
+        const gridHelper = new THREE.GridHelper(200, 50, 0x00ff00, 0x333333);
+        scene.add(gridHelper);
+        console.log('[Staging] Grid helper added');
+        
+        // 4. Orientation Cube (Reference Point)
+        const boxGeo = new THREE.BoxGeometry(2, 2, 2);
+        const boxMat = new THREE.MeshStandardMaterial({ color: 0x00ff00, wireframe: true });
+        const spawnBox = new THREE.Mesh(boxGeo, boxMat);
+        spawnBox.position.set(0, 1, -10); // 10 meters in front of spawn
+        scene.add(spawnBox);
+        console.log('[Staging] Reference cube placed at (0, 1, -10)');
+        
+        // --- END STAGING AREA ---
+        
         // Fable-style sky colors
         scene.background = new THREE.Color(0x87ceeb); // Sky blue
         scene.fog = new THREE.FogExp2(0x87ceeb, SETTINGS.HIFI ? 0.008 : 0);
         
         console.log('[initGame] Creating camera...');
         camera = new THREE.PerspectiveCamera(SETTINGS.FOV_BASE, window.innerWidth / window.innerHeight, 0.01, 1000);
-        cameraRig = new THREE.Group();
-        try {
-            const saved = JSON.parse(localStorage.getItem('omni_ops_save_v7') || '{}');
-            if (saved.pos) cameraRig.position.set(saved.pos.x, saved.pos.y, saved.pos.z);
-            else cameraRig.position.set((myPlayerIndex % 2) * 5, 0, (Math.floor(myPlayerIndex / 2)) * 5);
-        } catch(e) {
-            console.error('[Init] Failed to load saved position:', e);
-            cameraRig.position.set((myPlayerIndex % 2) * 5, 0, (Math.floor(myPlayerIndex / 2)) * 5);
-        }
+        camera.rotation.order = "YXZ"; // ✅ Prevents gimbal lock
+        camera.position.set(0, 0, 0); // Camera at center of player rig
         
-        console.log('[initGame] Camera rig positioned at:', cameraRig.position);
-        console.log('[initGame] Camera offset from rig:', camera.position);
-        console.log('[initGame] Camera looking at:', camera.getWorldDirection(new THREE.Vector3()));
-        console.log('[World] Camera initialized');
-        console.log('[World] Player spawned');
+        // ✅ PLAYER RIG - Replaces cameraRig with Object3D for proper FPS movement
+        const playerRig = new THREE.Object3D();
+        playerRig.position.set(0, 1.6, 5); // ✅ Fix the void - start above ground at eye level
+        cameraRig = playerRig; // Keep cameraRig reference for compatibility
         
-        scene.add(cameraRig);
-        cameraRig.add(camera);
+        console.log('[initGame] Player rig positioned at:', playerRig.position);
+        console.log('[initGame] Camera at player center:', camera.position);
+        console.log('[World] Camera initialized with YXZ rotation order');
+        console.log('[World] Player spawned at height 1.6');
+        
+        scene.add(playerRig);
+        playerRig.add(camera);
         window.camera = camera;
         window.cameraRig = cameraRig;
         window.player = player;
@@ -175,9 +212,11 @@ function initGame() {
         
         activeCamera = camera;
         
+        // ✅ WEAPON RIG - Enhanced with reference position
         weaponRig = new THREE.Group(); camera.add(weaponRig);
         weaponPivot = new THREE.Group(); weaponRig.add(weaponPivot);
-        weaponPivot.position.set(0.35, -0.35, -0.6);
+        weaponPivot.position.set(0.2, -0.3, -0.5); // ✅ Adjusted to reference (lower right screen)
+        console.log('[Weapon] Rig initialized at (0.2, -0.3, -0.5)');
         
         console.log('[initGame] Creating WebGL renderer...');
         renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -271,6 +310,23 @@ function initGame() {
         console.log('[initGame] World generated successfully');
 
         window.addEventListener('resize', onResize);
+        
+        // --- GLOBAL EXPORTS FOR STORY MODULES ---
+        // ✅ Expose critical systems for Chapter 1 integration bridge
+        window.scene = scene;
+        window.camera = camera;
+        window.cameraRig = cameraRig; // playerRig mapped for compatibility
+        window.renderer = renderer;
+        window.THREE = THREE; // THREE.js library reference
+        console.log('[Core] ✅ Global systems exposed for Chapter 1');
+        console.log('[Core] Exports:', {
+            scene: !!window.scene,
+            camera: !!window.camera,
+            cameraRig: !!window.cameraRig,
+            renderer: !!window.renderer,
+            THREE: !!window.THREE
+        });
+        
         console.log('[initGame] Animation loop starting');
         animate();
         
@@ -359,6 +415,18 @@ function launchGame() {
         initGame();
         console.log('[launchGame] Setting isGameActive = true');
         isGameActive = true;
+        
+        // ✅ GLOBAL ACTIVATION FLAG - Critical for Chapter 1 integration
+        window.isGameActive = true;
+        console.log('[Core] ✅ Game State set to ACTIVE');
+        console.log('[Core] Ready state check:', {
+            isGameActive: window.isGameActive,
+            scene: !!window.scene,
+            cameraRig: !!window.cameraRig,
+            camera: !!window.camera,
+            THREE: !!window.THREE
+        });
+        
         if (!isMultiplayer) {
             onSinglePlayerWorldReady();
         }
@@ -1526,11 +1594,43 @@ function setupLighting() {
     scene.add(ambientLight2);
 }
 
+// ✅ PROJECTILE POOL - For physics-based shots (Reference: ThreeJS_FPS_2.0)
+const projectiles = [];
+const MAX_PROJECTILES = 20;
+
+function initProjectiles() {
+    const sphereGeometry = new THREE.IcosahedronGeometry(0.1, 1);
+    const sphereMaterial = new THREE.MeshStandardMaterial({ 
+        color: 0xffaa00, 
+        emissive: 0xffaa00, 
+        emissiveIntensity: 2 
+    });
+    
+    for (let i = 0; i < MAX_PROJECTILES; i++) {
+        const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+        sphere.castShadow = true;
+        sphere.visible = false;
+        scene.add(sphere);
+        projectiles.push({
+            mesh: sphere,
+            velocity: new THREE.Vector3(),
+            active: false,
+            lifetime: 0
+        });
+    }
+    console.log('[Weapon] Projectile pool initialized:', MAX_PROJECTILES);
+}
+
 function setupWeapon() {
+    // ✅ Initialize projectile pool
+    initProjectiles();
+    
     weaponMesh = new THREE.Group();
     const darkMetal = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.8, roughness: 0.2 });
     const blackPlastic = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.8 });
     
+    // ✅ Try to load GLTF model (optional enhancement)
+    // Fallback to procedural weapon if model not found
     const receiver = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.08, 0.25), darkMetal);
     weaponMesh.add(receiver);
     
@@ -2354,6 +2454,52 @@ function startReload() {
     player.isReloading = true; player.reloadTimer = SETTINGS.RELOAD_TIME; player.isAiming = false; playReloadSound();
 }
 
+// ✅ FIRE WEAPON - Enhanced wrapper matching reference API
+function fireWeapon() {
+    if (player.isReloading) {
+        console.log('[Weapon] Cannot fire - reloading');
+        return false;
+    }
+    
+    const result = tryShoot();
+    if (result) {
+        console.log('[Weapon] ✅ Shot fired | Ammo:', player.ammo, '| Mode:', SETTINGS.FIRE_MODES[player.fireModeIndex]);
+        
+        // ✅ Optional: Launch physics projectile (reference feature)
+        // launchProjectile();
+    }
+    return result;
+}
+
+// ✅ LAUNCH PROJECTILE - Physics-based shot (Reference: throwBall)
+function launchProjectile() {
+    // Find inactive projectile
+    const proj = projectiles.find(p => !p.active);
+    if (!proj) return;
+    
+    // Get camera direction
+    const shootDir = new THREE.Vector3();
+    camera.getWorldDirection(shootDir);
+    shootDir.normalize();
+    
+    // Position projectile at muzzle
+    const startPos = new THREE.Vector3();
+    if (muzzleFlashMesh) {
+        muzzleFlashMesh.getWorldPosition(startPos);
+    } else {
+        camera.getWorldPosition(startPos);
+        startPos.addScaledVector(shootDir, 0.5);
+    }
+    
+    proj.mesh.position.copy(startPos);
+    proj.velocity.copy(shootDir).multiplyScalar(50); // High speed
+    proj.active = true;
+    proj.lifetime = 3.0; // 3 seconds
+    proj.mesh.visible = true;
+    
+    console.log('[Projectile] Launched at', startPos.toArray().map(n => n.toFixed(2)));
+}
+
 function tryShoot() {
     if (player.ammo <= 0 || player.isReloading || player.isSprinting) return false;
     player.ammo--; updateHUDAmmo(); playShootSound();
@@ -2379,6 +2525,13 @@ function tryShoot() {
     player.lastShotEnd = { x: targetPoint.x, y: targetPoint.y, z: targetPoint.z };
     
     if(hits.length > 0) {
+        // ✅ Enhanced logging matching reference
+        console.log('[Weapon] 🎯 HIT!', {
+            target: hits[0].object.name || 'Unknown',
+            distance: hits[0].distance.toFixed(2) + 'm',
+            point: hits[0].point.toArray().map(n => n.toFixed(2))
+        });
+        
         const hitmarker = document.getElementById('hitmarker');
         if (hitmarker) {
             hitmarker.style.opacity = '1';
@@ -2423,6 +2576,37 @@ function createImpactEffect(point, normal) {
     }
 }
 
+// ✅ APPLY CONTROLS - Ported from ThreeJS_FPS_2.0 controls.js
+// Uses camera matrixWorld for accurate directional movement
+function applyControls(deltaTime) {
+    const playerOnFloor = player.onGround;
+    const speedDelta = deltaTime * (playerOnFloor ? SETTINGS.ACCEL : SETTINGS.ACCEL * 0.3);
+
+    // ✅ Manually update the camera's world matrix
+    camera.updateMatrixWorld();
+
+    const forward = new THREE.Vector3();
+    const side = new THREE.Vector3();
+
+    // ✅ Use matrixWorld to get accurate directional vectors
+    if (camera.matrixWorld) {
+        forward.setFromMatrixColumn(camera.matrixWorld, 0);
+        forward.crossVectors(camera.up, forward).normalize();
+
+        side.setFromMatrixColumn(camera.matrixWorld, 0).normalize();
+    }
+
+    // ✅ Apply WASD movement where you're looking
+    if (keys['KeyW']) player.velocity.add(forward.clone().multiplyScalar(speedDelta));
+    if (keys['KeyS']) player.velocity.add(forward.clone().multiplyScalar(-speedDelta));
+    if (keys['KeyA']) player.velocity.add(side.clone().multiplyScalar(-speedDelta));
+    if (keys['KeyD']) player.velocity.add(side.clone().multiplyScalar(speedDelta));
+    
+    // ✅ Apply friction
+    player.velocity.x -= player.velocity.x * SETTINGS.FRICTION * deltaTime;
+    player.velocity.z -= player.velocity.z * SETTINGS.FRICTION * deltaTime;
+}
+
 function updatePhysics(delta) {
     if (gameState.isInDialogue || gameState.isPipboyOpen || gameState.isInventoryOpen) return; 
 
@@ -2448,19 +2632,16 @@ function updatePhysics(delta) {
         window.pointerLockLostOnce = false;
     }
     
+    // ✅ APPLY CONTROLS - Uses camera matrixWorld for directional movement
+    applyControls(delta);
+    
     // STAMINA SYSTEM
-    const moveDir = new THREE.Vector3();
-    if (keys['KeyW']) moveDir.z -= 1; if (keys['KeyS']) moveDir.z += 1;
-    if (keys['KeyA']) moveDir.x -= 1; if (keys['KeyD']) moveDir.x += 1;
-    moveDir.normalize();
-
-    const isMoving = moveDir.length() > 0;
+    const isMoving = (keys['KeyW'] || keys['KeyS'] || keys['KeyA'] || keys['KeyD']);
     
     // Debug: Log input state every 60 frames
-    if (window.frameCount % 60 === 0 && isStartFrame) {
+    if (window.frameCount % 60 === 0 && window.isStartFrame) {
         console.log('[Movement Debug]', {
             keysPressed: { W: keys['KeyW'], A: keys['KeyA'], S: keys['KeyS'], D: keys['KeyD'] },
-            moveDir: { x: moveDir.x.toFixed(2), z: moveDir.z.toFixed(2) },
             isMoving: isMoving,
             velocity: { x: player.velocity.x.toFixed(2), z: player.velocity.z.toFixed(2), y: player.velocity.y.toFixed(2) },
             cameraPos: { x: cameraRig.position.x.toFixed(1), y: cameraRig.position.y.toFixed(1), z: cameraRig.position.z.toFixed(1) },
@@ -2493,13 +2674,13 @@ function updatePhysics(delta) {
     player.isCrouching = !!(keys['ControlLeft'] || keys['ControlRight'] || keys['Control']);
     let speedTarget = player.isSprinting ? SETTINGS.MAX_SPRINT : (player.isCrouching || player.isAiming ? SETTINGS.MAX_CROUCH : SETTINGS.MAX_WALK);
     
-    const wishDir = moveDir.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), player.yaw);
-    if (moveDir.length() > 0) {
-        player.velocity.addScaledVector(wishDir, SETTINGS.ACCEL * delta);
-        if (player.velocity.length() > speedTarget) player.velocity.setLength(speedTarget);
+    // ✅ Speed limiting after applyControls
+    const horizontalVel = new THREE.Vector2(player.velocity.x, player.velocity.z);
+    if (horizontalVel.length() > speedTarget) {
+        horizontalVel.normalize().multiplyScalar(speedTarget);
+        player.velocity.x = horizontalVel.x;
+        player.velocity.z = horizontalVel.y;
     }
-    player.velocity.x -= player.velocity.x * SETTINGS.FRICTION * delta;
-    player.velocity.z -= player.velocity.z * SETTINGS.FRICTION * delta;
     player.velocity.y -= SETTINGS.GRAVITY * delta;
     const nextPos = cameraRig.position.clone().addScaledVector(player.velocity, delta);
     
@@ -2580,8 +2761,9 @@ function animate() {
         cameraRig.rotation.y = player.yaw; 
         
         player.adsFactor = THREE.MathUtils.lerp(player.adsFactor, player.isAiming ? 1 : 0, delta * 12);
-        const basePosX = THREE.MathUtils.lerp(0.35, 0.0, player.adsFactor);
-        let basePosY = THREE.MathUtils.lerp(-0.35, -0.15, player.adsFactor);
+        // ✅ Adjusted base positions to match new weapon rig (0.2, -0.3, -0.5)
+        const basePosX = THREE.MathUtils.lerp(0.2, 0.0, player.adsFactor);
+        let basePosY = THREE.MathUtils.lerp(-0.3, -0.15, player.adsFactor);
         if (player.isReloading) {
             player.reloadTimer -= delta;
             basePosY -= Math.sin((player.reloadTimer / SETTINGS.RELOAD_TIME) * Math.PI) * 0.8;
@@ -2593,7 +2775,7 @@ function animate() {
                 updateHUDAmmo();
             }
         }
-        weaponPivot.position.set(basePosX, basePosY, -0.6);
+        weaponPivot.position.set(basePosX, basePosY, -0.5); // ✅ Updated Z to -0.5
         
         player.fireTimer -= delta;
         if (player.burstCount > 0) {
@@ -2639,6 +2821,41 @@ function animate() {
     for (let i = particles.length - 1; i >= 0; i--) {
         const p = particles[i]; p.life -= delta * 2.5; p.vel.add(p.gravity); p.mesh.position.add(p.vel); p.mesh.scale.setScalar(p.life);
         if (p.life <= 0) { scene.remove(p.mesh); particles.splice(i, 1); }
+    }
+    
+    // ✅ Update physics projectiles (Reference: ThreeJS_FPS_2.0)
+    for (let i = projectiles.length - 1; i >= 0; i--) {
+        const proj = projectiles[i];
+        if (!proj.active) continue;
+        
+        // Apply gravity
+        proj.velocity.y -= SETTINGS.GRAVITY * delta;
+        
+        // Move projectile
+        proj.mesh.position.addScaledVector(proj.velocity, delta);
+        
+        // Decrease lifetime
+        proj.lifetime -= delta;
+        
+        // Collision check with objects
+        const projBox = new THREE.Box3().setFromObject(proj.mesh);
+        for (const obj of objects) {
+            if (!obj) continue;
+            const objBox = new THREE.Box3().setFromObject(obj);
+            if (projBox.intersectsBox(objBox)) {
+                console.log('[Projectile] 💥 Collided with object');
+                createImpactEffect(proj.mesh.position, new THREE.Vector3(0, 1, 0));
+                proj.active = false;
+                proj.mesh.visible = false;
+                break;
+            }
+        }
+        
+        // Deactivate if lifetime expired or fell below world
+        if (proj.lifetime <= 0 || proj.mesh.position.y < -10) {
+            proj.active = false;
+            proj.mesh.visible = false;
+        }
     }
     
     // Render the scene
