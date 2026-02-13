@@ -1,0 +1,233 @@
+You are my senior gameplay programmer + tools-savvy narrative integrator for the game OMNI‑OPS.
+
+Goal: Wire up Act 1, Chapter 1 “Cold Boot” into gameplay code using existing narrative design:
+
+Objectives and quest‑log entries (IDs like OBJ_C1_WAKE, OBJ_C1_REACH_NODE_ENTRANCE).
+
+ARIA VO lines (IDs like ARIA_C1_001–ARIA_C1_027).
+
+Tutorial prompts (TUT_*) and fail/edge‑case messages.
+
+You are working in this codebase:
+
+Engine: [fill in: Unity / Unreal / custom].
+
+Language: [C# / C++ / TypeScript / etc.].
+
+Project structure:
+
+Scripts/Quests/ – quest and objective logic.
+
+Scripts/UI/ – HUD, compass, objective text.
+
+Scripts/Audio/VO/ – VO event triggers/bindings.
+
+Assets/Localization/ – JSON or CSV string tables for UI/quests/tutorial text.
+
+Use the following narrative artifacts as source of truth (do not invent new structure unless necessary):
+
+Act 1, Chapter 1 mission summary, objectives, and quest‑log text (IDs: OBJ_C1_*).
+
+Tutorial prompts (IDs: TUT_*).
+
+ARIA VO table (IDs: ARIA_C1_*).
+
+Your job is to:
+
+Define data structures for Chapter 1 content
+
+Create or extend types for:
+
+Quest / Mission.
+
+Objective (with ID, state, and references to localization keys + VO IDs).
+
+TutorialPrompt (ID, trigger conditions, localization key, optional VO ID).
+
+Use clean, strongly‑typed enums/structs where possible (e.g., ObjectiveState, TriggerType).
+
+Create data definitions for Chapter 1
+
+Implement a single source of truth (e.g., a scriptable object, data asset, or JSON) that contains all Chapter 1 objectives in order:
+
+OBJ_C1_WAKE
+
+OBJ_C1_FIRST_MOVEMENT
+
+OBJ_C1_LISTEN_TO_ARIA
+
+OBJ_C1_SCAVENGE_GEAR
+
+OBJ_C1_UNDERSTAND_THREAT
+
+OBJ_C1_REACH_HUB_EXIT
+
+OBJ_C1_SURVIVE_BUFFER_ZONE
+
+OBJ_C1_FIRST_HAZARD
+
+OBJ_C1_REACH_NODE_ENTRANCE
+
+For each, store:
+
+Objective ID (code).
+
+Localization keys for:
+
+On‑screen objective text.
+
+Quest‑log entry.
+
+Optional hint.
+
+Optional ARIA VO IDs to trigger on start/complete.
+
+Any flags (e.g., isTutorialObjective, canFail, isMilestone).
+
+Wire objectives to triggers in code
+
+Implement a Chapter1ColdBootController (or similar) that:
+
+Subscribes to engine events (player spawn, first input, terminal interacted, workbench used, exit volume crossed, etc.).
+
+Advances objectives in the correct order using a finite state machine or simple step index.
+
+On objective start:
+
+Pushes HUD objective text.
+
+Plays ARIA VO line if configured.
+
+Logs to the quest log.
+
+On objective completion:
+
+Marks objective as complete.
+
+Unlocks the next objective.
+
+Integrate ARIA VO triggers
+
+Implement a small VO helper, e.g. VoDirector.Play("ARIA_C1_001"), that:
+
+Looks up the correct audio event or asset (e.g., Wwise/Unreal Audio).
+
+Handles interrupt rules (don’t play overlapping ARIA lines; queue them).
+
+In Chapter1ColdBootController, call VO events at the correct times:
+
+OBJ_C1_WAKE start → ARIA_C1_001.
+
+OBJ_C1_FIRST_MOVEMENT → ARIA_C1_002.
+
+Mission briefing → ARIA_C1_003–005 spaced over time.
+
+Exiting facility → ARIA_C1_011,012.
+
+First hazard → ARIA_C1_013–017 depending on stealth vs combat.
+
+Node arrival → ARIA_C1_025–027.
+
+Hook tutorial prompts to gameplay
+
+Implement a TutorialManager that:
+
+Watches for triggers like:
+
+First camera move.
+
+First enemy sighting.
+
+First weapon equip.
+
+Low ammo/health.
+
+Player leaving a defined Chapter 1 volume.
+
+Shows a non‑blocking HUD prompt using localization keys (e.g., TUT_MOVEMENT_TITLE, TUT_MOVEMENT_BODY).
+
+Optionally triggers a short ARIA line (e.g., ARIA_C1_018 for navigation).
+
+Ensure prompts:
+
+Only show once (unless explicitly re‑armed).
+
+Can be dismissed.
+
+Respect a simple “tutorials enabled” toggle.
+
+Fail/edge case handling
+
+Implement logic for:
+
+Player death in Chapter 1:
+
+Show lore‑friendly death text.
+
+Reload last checkpoint.
+
+Player wandering off:
+
+Trigger ARIA navigation VO lines after a timeout or distance threshold.
+
+Friendly fire (if ally present):
+
+Play ARIA warning lines and optional reputation hook.
+
+All messages should be driven by localization keys and/or ARIA VO IDs, not hard‑coded strings.
+
+Localization‑ready string tables
+
+Generate or update a localization file (e.g., Assets/Localization/quests_chapter1_en.json) with entries for:
+
+All OBJ_C1_* titles, log texts, hints.
+
+All TUT_* titles/bodies.
+
+All fail/state messages.
+
+Use consistent key naming, e.g.:
+
+OBJ_C1_WAKE_TITLE
+
+OBJ_C1_WAKE_LOG
+
+OBJ_C1_WAKE_HINT
+
+TUT_MOVEMENT_TITLE
+
+TUT_MOVEMENT_BODY
+
+Deliverables for this request
+
+In your response:
+
+List which files you will create or modify (with paths), for example:
+
+Scripts/Quests/Chapter1ColdBootController.[ext]
+
+Scripts/Quests/QuestTypes.[ext]
+
+Scripts/Systems/TutorialManager.[ext]
+
+Scripts/Audio/VoDirector.[ext]
+
+Assets/Localization/quests_chapter1_en.json
+
+For each file, provide idiomatic, ready‑to‑paste code that:
+
+Compiles in the target engine/language.
+
+Uses clear, maintainable structure.
+
+Includes TODO comments only where integration with engine‑specific systems is required (e.g., Wwise event name, Unreal delegate binding).
+
+Show an example of:
+
+One fully wired objective (OBJ_C1_WAKE) from data → code → HUD/VO.
+
+One tutorial prompt.
+
+One fail/edge‑case handler (e.g., “player leaves mission area”).
+
+Do not invent new story content, objectives, or VO. Only structure and wire up what’s already defined for OMNI‑OPS Act 1, Chapter 1 “Cold Boot”.

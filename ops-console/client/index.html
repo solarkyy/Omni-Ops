@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Omni-Ops Ops Console</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Courier New', monospace;
+      background: #0a0e27;
+      color: #e0e6ff;
+      overflow: hidden;
+    }
+
+    /* Main layout: horizontal split */
+    #app {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+
+    /* Status bar */
+    #status-bar {
+      background: #1a1f3a;
+      border-bottom: 2px solid #00ff88;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      font-size: 14px;
+    }
+
+    .status-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .health-indicator {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    .health-indicator.ready {
+      background: #00ff88;
+      box-shadow: 0 0 8px #00ff88;
+    }
+
+    .health-indicator.warning {
+      background: #ffaa00;
+      box-shadow: 0 0 8px #ffaa00;
+    }
+
+    .health-indicator.error {
+      background: #ff4444;
+      box-shadow: 0 0 8px #ff4444;
+    }
+
+    /* Main content area: three-column */
+    #main {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* Left panel: Dashboard */
+    #left-panel {
+      flex: 0 0 35%;
+      background: #0f1429;
+      border-right: 1px solid #2a3f5f;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      padding: 16px;
+    }
+
+    /* Right panel: Chat */
+    #right-panel {
+      flex: 1;
+      background: #0a0e27;
+      display: flex;
+      flex-direction: column;
+      border-left: 1px solid #2a3f5f;
+    }
+
+    /* Section headers */
+    .section-title {
+      font-size: 13px;
+      font-weight: bold;
+      color: #00ff88;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      border-bottom: 1px solid #2a3f5f;
+      padding-bottom: 6px;
+    }
+
+    /* Snapshot panel */
+    #snapshot-section {
+      margin-bottom: 20px;
+    }
+
+    .snapshot-field {
+      font-size: 12px;
+      margin: 6px 0;
+      line-height: 1.4;
+    }
+
+    .snapshot-field-label {
+      color: #00ff88;
+      font-weight: bold;
+    }
+
+    .snapshot-field-value {
+      color: #b0b6ff;
+      margin-left: 8px;
+    }
+
+    /* Tests panel */
+    #tests-section {
+      margin-bottom: 20px;
+    }
+
+    .test-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 350px;
+      overflow-y: auto;
+    }
+
+    .test-item {
+      background: #1a1f3a;
+      border: 1px solid #2a3f5f;
+      padding: 8px 12px;
+      border-radius: 4px;
+      font-size: 11px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .test-item:hover {
+      background: #252d4a;
+      border-color: #00ff88;
+    }
+
+    .test-item button {
+      background: #00ff88;
+      color: #0a0e27;
+      border: none;
+      padding: 4px 8px;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: bold;
+      transition: all 0.2s;
+    }
+
+    .test-item button:hover {
+      background: #00dd77;
+      transform: scale(1.05);
+    }
+
+    .test-item.running button {
+      background: #ffaa00;
+      color: #0a0e27;
+    }
+
+    .test-item.passed {
+      border-color: #00ff88;
+    }
+
+    .test-item.failed {
+      border-color: #ff4444;
+    }
+
+    /* Last test result */
+    #last-test-result {
+      background: #1a1f3a;
+      border: 1px solid #2a3f5f;
+      border-radius: 4px;
+      padding: 10px;
+      margin-top: 10px;
+      font-size: 11px;
+    }
+
+    .test-result-title {
+      color: #00ff88;
+      font-weight: bold;
+      margin-bottom: 6px;
+    }
+
+    .test-result-reason {
+      color: #b0b6ff;
+      margin: 4px 0 4px 12px;
+      font-size: 10px;
+    }
+
+    /* Chat panel */
+    #chat-panel {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      padding: 16px;
+    }
+
+    #chat-history {
+      flex: 1;
+      overflow-y: auto;
+      margin-bottom: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .chat-message {
+      margin-bottom: 12px;
+    }
+
+    .chat-bubble {
+      background: #1a1f3a;
+      border: 1px solid #2a3f5f;
+      border-radius: 6px;
+      padding: 10px 12px;
+      font-size: 12px;
+      line-height: 1.5;
+      word-wrap: break-word;
+    }
+
+    .chat-bubble.user {
+      background: #1a2d5a;
+      border-color: #00ff88;
+      margin-left: 20px;
+    }
+
+    .chat-bubble.summary {
+      background: #142338;
+      border-color: #88ccff;
+      margin-right: 20px;
+    }
+
+    .chat-bubble.code {
+      background: #2a1f3a;
+      border-color: #ff88ff;
+      margin-right: 20px;
+    }
+
+    .chat-bubble.omnidev {
+      background: #1a3a2a;
+      border-color: #00ffaa;
+      margin-right: 20px;
+    }
+
+    .bubble-label {
+      font-size: 10px;
+      font-weight: bold;
+      color: #00ff88;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .chat-bubble.code .bubble-label {
+      color: #ff88ff;
+    }
+
+    .chat-bubble.summary .bubble-label {
+      color: #88ccff;
+    }
+
+    .chat-bubble.omnidev .bubble-label {
+      color: #00ffaa;
+    }
+
+    .omnidev-commands {
+      background: #0f1429;
+      border: 1px solid #00ffaa;
+      border-radius: 4px;
+      padding: 8px;
+      margin-top: 8px;
+      font-size: 10px;
+      max-height: 150px;
+      overflow-y: auto;
+      font-family: 'Courier New', monospace;
+    }
+
+    /* Input area */
+    #chat-input-area {
+      display: flex;
+      gap: 8px;
+    }
+
+    #chat-input {
+      flex: 1;
+      background: #1a1f3a;
+      border: 1px solid #2a3f5f;
+      color: #e0e6ff;
+      padding: 10px 12px;
+      border-radius: 4px;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    #chat-input:focus {
+      border-color: #00ff88;
+    }
+
+    #send-button {
+      background: #00ff88;
+      color: #0a0e27;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 12px;
+      transition: all 0.2s;
+    }
+
+    #send-button:hover {
+      background: #00dd77;
+      transform: scale(1.02);
+    }
+
+    #send-button:active {
+      transform: scale(0.98);
+    }
+
+    /* Quick command buttons */
+    #quick-commands {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+    }
+
+    .quick-btn {
+      background: #1a2d5a;
+      border: 1px solid #00ff88;
+      color: #00ff88;
+      padding: 6px 10px;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 10px;
+      transition: all 0.2s;
+    }
+
+    .quick-btn:hover {
+      background: #00ff88;
+      color: #0a0e27;
+    }
+
+    /* Scrollbars */
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: #0a0e27;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #2a3f5f;
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: #3a4f6f;
+    }
+
+    /* Loading spinner */
+    .spinner {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      background: #00ff88;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <!-- Status bar -->
+    <div id="status-bar">
+      <div class="status-item">
+        <span class="health-indicator ready" id="health-light"></span>
+        <strong id="health-text">AI: READY</strong>
+      </div>
+      <div class="status-item" id="mode-display">Mode: patrol_area</div>
+      <div class="status-item" id="threats-display">Threats: 0</div>
+      <div class="status-item" id="player-health-display">Health: 100%</div>
+      <div style="margin-left: auto; font-size: 11px; color: #888;">
+        Last refresh: <span id="last-refresh">never</span>
+      </div>
+    </div>
+
+    <!-- Main content -->
+    <div id="main">
+      <!-- Left panel: Dashboard -->
+      <div id="left-panel">
+        <!-- Snapshot -->
+        <div id="snapshot-section">
+          <div class="section-title">📊 Snapshot</div>
+          <div id="snapshot-freshness" style="font-size: 11px; color: #888; margin: -6px 0 8px 0;">Last snapshot: none yet</div>
+          <button style="width: 100%; background: #00ff88; color: #0a0e27; border: none; padding: 8px; border-radius: 4px; cursor: pointer; font-weight: bold; margin-bottom: 10px;" id="refresh-snapshot-btn">
+            Get Snapshot
+          </button>
+          <div id="snapshot-display"></div>
+        </div>
+
+        <!-- Tests -->
+        <div id="tests-section">
+          <div class="section-title">🧪 Tests</div>
+          <div id="tests-display" class="test-list"></div>
+          <div id="last-test-result"></div>
+        </div>
+      </div>
+
+      <!-- Right panel: Chat -->
+      <div id="right-panel">
+        <div id="chat-panel">
+          <div class="section-title">💬 AI Ops Chat</div>
+
+          <!-- Quick commands -->
+          <div id="quick-commands">
+            <button class="quick-btn" data-mode="patrol_area">🔄 Patrol</button>
+            <button class="quick-btn" data-mode="seek_enemies">🎯 Engage</button>
+            <button class="quick-btn" data-mode="hold_position">🛡️ Hold</button>
+            <button class="quick-btn" data-mode="return_to_safe_zone">🏃 Retreat</button>
+          </div>
+
+          <!-- Chat history -->
+          <div id="chat-history"></div>
+
+          <!-- Chat input -->
+          <div id="chat-input-area">
+            <input
+              type="text"
+              id="chat-input"
+              placeholder="Ask about AI behavior, run tests, or describe what you see..."
+              autocomplete="off"
+            />
+            <button id="send-button">Send</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="main.js"></script>
+</body>
+</html>
