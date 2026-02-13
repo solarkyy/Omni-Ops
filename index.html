@@ -163,6 +163,39 @@
             <div style="position:absolute; right:-15px; top:50%; transform:translateY(-50%); width:10px; height:3px; background:#0f6;"></div>
         </div>
         
+        <!-- SPECTER COMMAND HUD (Glassmorphism Aesthetic) -->
+        <div id="hud-visor" class="specter-hud" style="display:none;">
+            <!-- TOP LEFT: ARIA LINK & OBJECTIVES -->
+            <div class="hud-panel top-left">
+                <div class="hud-header">[▪ ARIA LINK ESTABLISHED ]</div>
+                <div id="objective-text" style="margin-top:10px; font-size:14px;">CURRENT OBJ: SECURE PERIMETER</div>
+            </div>
+            
+            <!-- BOTTOM LEFT: INTEGRITY & FABRICATION ENERGY -->
+            <div class="hud-panel bottom-left">
+                <div class="bar-label">INTEGRITY</div>
+                <div class="health-container">
+                    <div id="health-bar-fill" class="bar-fill"></div>
+                </div>
+                <div class="bar-label">FABRICATION ENERGY</div>
+                <div class="energy-container">
+                    <div id="energy-bar-fill" class="bar-fill energy"></div>
+                </div>
+            </div>
+            
+            <!-- BOTTOM RIGHT: WEAPON READOUT -->
+            <div class="hud-panel bottom-right">
+                <div id="weapon-name" style="font-size:14px; font-weight:bold;">AKM-74 TACTICAL</div>
+                <div class="ammo-readout" style="margin:8px 0; font-size:16px;">
+                    <span id="current-ammo">30</span> <span class="ammo-divider"> / </span> <span id="reserve-ammo">120</span>
+                </div>
+                <div id="fire-mode" style="font-size:12px; margin-top:5px;">AUTO</div>
+            </div>
+            
+            <!-- CENTER RETICLE -->
+            <div id="reticle" class="crosshair-bracket"></div>
+        </div>
+        
         <!-- HIT MARKER -->
         <div id="hitmarker" style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); width:40px; height:40px; border:2px solid #0f0; border-radius:50%; opacity:0; pointer-events:none; transition:opacity 0.1s;"></div>
         

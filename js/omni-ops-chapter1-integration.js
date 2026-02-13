@@ -329,6 +329,40 @@
                 }
                 // --- END UI SAFETY NET ---
                 
+                // ✅ CRASH PREVENTION: Map old IDs to new ones (Task 2)
+                if (!document.getElementById('intro-text')) {
+                    const ghostShim = document.createElement('div');
+                    ghostShim.id = 'intro-text'; // The ghost element the story script wants
+                    ghostShim.style.display = 'none'; // Keep it hidden
+                    document.body.appendChild(ghostShim);
+
+                    // Intercept writes to the ghost element and move them to the real HUD
+                    Object.defineProperty(ghostShim, 'innerText', {
+                        set: function(val) {
+                            if (window.updateDialogue && typeof window.updateDialogue === 'function') {
+                                window.updateDialogue(val);
+                            } else {
+                                console.log('[Shim] No updateDialogue handler, text would be:', val);
+                            }
+                        },
+                        get: function() { return ''; }
+                    });
+                    
+                    // Also intercept innerHTML to catch alternative write methods
+                    Object.defineProperty(ghostShim, 'innerHTML', {
+                        set: function(val) {
+                            if (window.updateDialogue && typeof window.updateDialogue === 'function') {
+                                window.updateDialogue(val.replace(/<[^>]*>/g, ''));
+                            }
+                        },
+                        get: function() { return ''; }
+                    });
+                    
+                    console.log('[Compatibility Layer] ✅ Enhanced ghost element shim created for #intro-text with innerText/innerHTML interception');
+                } else {
+                    console.log('[Compatibility Layer] ✅ Ghost element #intro-text already exists');
+                }
+                
                 if (window.GameStory && window.GameStory.startIntro) {
                     console.log('[Chapter 1 Integration] 🎬 Triggering GameStory.startIntro()...');
                     try {
@@ -360,6 +394,11 @@
                 }
                 
                 onReady();
+                
+                // ✅ TASK 4: Call initializeChapter1Story immediately after checkReady succeeds
+                console.log('[Chapter 1 Integration] 🚀 Initiating Story Mode...');
+                initializeChapter1Story();
+                
                 return;
             }
 

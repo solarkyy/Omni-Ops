@@ -1,0 +1,22 @@
+{
+  "name": "omni-ops",
+  "version": "1.0.0",
+  "description": "OMNI-OPS: A professional tactical RPG with native desktop support",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --remote-debugging-port=9222"
+  },
+  "devDependencies": {
+    "electron": "^31.7.7"
+  },
+  "author": "solarkyy",
+  "license": "MIT",
+  "keywords": [
+    "game",
+    "three.js",
+    "fps",
+    "rts",
+    "multiplayer"
+  ]
+}

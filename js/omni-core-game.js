@@ -1,7 +1,15 @@
 // OMNI-OPS CORE GAME v11 - Complete Base System
+// ✅ FIXED IMPORTS for Three.js v0.160+
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { AnimationMixer } from 'three';
+
 (function() {
     'use strict';
     console.log('[Core Game] Initializing v11...');
+    
+    // ✅ Task 1: Assign THREE globally to prevent Multiple Three warning
+    window.THREE = THREE;
 
 const SETTINGS = {
     MOUSE_SENSE: 0.002, ADS_SENSE_MULT: 0.5, ACCEL: 130, FRICTION: 12,
@@ -26,6 +34,30 @@ const gameState = {
     isPipboyOpen: false,
     isInventoryOpen: false
 };
+
+// --- WEAPON POSITIONING (Iron Sights / ADS) ---
+const WEAPON_POS = {
+    HIP: new THREE.Vector3(0.2, -0.3, -0.5),  // Standard hipfire position
+    ADS: new THREE.Vector3(0, -0.165, -0.2),  // Centered (sights aligned)
+    ADS_FOV: 50,  // Zoomed FOV
+    HIP_FOV: 75   // Normal FOV
+};
+let currentGunAnim = 'Armature|Idle';  // Track current animation state
+
+// ✅ Task 2: Spring Inertia System (The "Weight" Fix)
+const gunSpring = { 
+    pos: new THREE.Vector3(), 
+    vel: new THREE.Vector3(), 
+    stiffness: 120, 
+    damping: 15 
+};
+
+// --- FIELD FABRICATION SYSTEM ---
+window.fabricationEnergy = 100;
+window.maxFabricationEnergy = 100;
+window.isFabricationMode = false;  // F2 Toggle State
+window.editorGrid = null;  // The Holographic Grid
+console.log('[System] ✅ Field Fabrication System initialized');
 
 // --- CORE VARIABLES ---
 let scene, camera, renderer, clock;
@@ -143,48 +175,39 @@ function initGame() {
         console.log('[World] Scene created');
         window.scene = scene;
         
-        // --- TEMPORARY STAGING AREA (Fix for Void) ---
-        // 1. Lighting (Essential for visibility)
-        const stagingAmbient = new THREE.AmbientLight(0xffffff, 1.2); // High intensity to ensure visibility
-        scene.add(stagingAmbient);
+        // --- TACTICAL DAY ENVIRONMENT (Visual Overhaul) ---
+        // 1. Sky & Fog (Tactical Blue)
+        scene.background = new THREE.Color(0x87CEEB);
+        scene.fog = new THREE.Fog(0x87CEEB, 0, 750);
+        console.log('[Visuals] Tactical blue sky and fog applied');
         
-        const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
-        dirLight.position.set(10, 20, 10);
+        // 2. Lighting (Bright Day)
+        // Remove old lights if necessary to avoid duplication
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(50, 50, 50);
         dirLight.castShadow = true;
         scene.add(dirLight);
-        console.log('[Staging] Lighting initialized');
+        console.log('[Visuals] Bright day lighting initialized');
         
-        // 2. The Floor (Dark Grey Matte)
-        const floorGeo = new THREE.PlaneGeometry(200, 200);
-        const floorMat = new THREE.MeshStandardMaterial({
-            color: 0x1a1a1a, // Dark grey to match UI background
-            roughness: 0.8
-        });
+        // 3. The Grid Floor (Reference Style)
+        // Replace the dark floor with a lighter tactical grid
+        const grid = new THREE.GridHelper(100, 20, 0x000000, 0x000000);
+        grid.material.opacity = 0.2;
+        grid.material.transparent = true;
+        scene.add(grid);
+        const floorGeo = new THREE.PlaneGeometry(100, 100);
+        const floorMat = new THREE.MeshStandardMaterial({ color: 0xdddddd });
         const floor = new THREE.Mesh(floorGeo, floorMat);
-        floor.rotation.x = -Math.PI / 2; // Rotate flat
+        floor.rotation.x = -Math.PI / 2;
         floor.receiveShadow = true;
         scene.add(floor);
-        console.log('[Staging] Floor created');
+        console.log('[Visuals] Tactical grid floor created');
         
-        // 3. The Grid (Sci-Fi Aesthetic)
-        // Size: 200, Divisions: 50, CenterLine: Neon Green, Grid: Dark Grey
-        const gridHelper = new THREE.GridHelper(200, 50, 0x00ff00, 0x333333);
-        scene.add(gridHelper);
-        console.log('[Staging] Grid helper added');
+        // --- END TACTICAL DAY ENVIRONMENT ---
         
-        // 4. Orientation Cube (Reference Point)
-        const boxGeo = new THREE.BoxGeometry(2, 2, 2);
-        const boxMat = new THREE.MeshStandardMaterial({ color: 0x00ff00, wireframe: true });
-        const spawnBox = new THREE.Mesh(boxGeo, boxMat);
-        spawnBox.position.set(0, 1, -10); // 10 meters in front of spawn
-        scene.add(spawnBox);
-        console.log('[Staging] Reference cube placed at (0, 1, -10)');
-        
-        // --- END STAGING AREA ---
-        
-        // Fable-style sky colors
-        scene.background = new THREE.Color(0x87ceeb); // Sky blue
-        scene.fog = new THREE.FogExp2(0x87ceeb, SETTINGS.HIFI ? 0.008 : 0);
+        // Tactical environment already configured above
         
         console.log('[initGame] Creating camera...');
         camera = new THREE.PerspectiveCamera(SETTINGS.FOV_BASE, window.innerWidth / window.innerHeight, 0.01, 1000);
@@ -439,6 +462,15 @@ function launchGame() {
     }
 }
 
+// ✅ Task 2: Emergency Bypass - Force start if AI bridge is offline
+setTimeout(() => {
+    if (!window.isGameActive) {
+        console.log('[System] AI Bridge not found. Launching in Local Mode...');
+        window.isGameActive = true;
+        initGame();
+    }
+}, 2000);
+
 let pointerLockRetryTimer = null;
 function safeRequestPointerLock() {
     if (!gameState.isInDialogue && !gameState.isPipboyOpen && !gameState.isInventoryOpen && isGameActive) {
@@ -655,10 +687,15 @@ function startMatch() {
 }
 
 function updateHUDAmmo() {
-    const ammoCur = document.getElementById('ammo-cur');
-    const ammoRes = document.getElementById('ammo-res');
-    if (ammoCur) ammoCur.innerText = player.ammo;
-    if (ammoRes) ammoRes.innerText = player.reserveAmmo;
+    // ✅ MASTER SAFETY WRAPPER (Task 2) - Safe element updates
+    const safeUpdate = (id, value) => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.innerText = value;
+        }
+    };
+    safeUpdate('ammo-cur', player.ammo);
+    safeUpdate('ammo-res', player.reserveAmmo || 120);
 }
 
 function logMessage(msg) {
@@ -776,6 +813,17 @@ window.initializeUI = function() {
             myPlayerIndex = 0;
             lobbySlots[0] = "LOCAL_PLAYER";
             
+            // ✅ Emergency Bypass with timeout for AI Bridge latency
+            setTimeout(() => {
+                if (!window.isGameActive) {
+                    console.log('[System] AI Bridge not found. Launching in Local Mode...');
+                    window.isGameActive = true;
+                    if (typeof initGame === 'function') {
+                        initGame();
+                    }
+                }
+            }, 2000);
+            
             // Call launchGame which creates scene, renderer, camera, player
             launchGame();
         } else {
@@ -865,6 +913,15 @@ window.initializeUI = function() {
 
     const fovSlider = document.getElementById('set-fov');
     if(fovSlider) fovSlider.oninput = (e) => { SETTINGS.FOV_BASE = parseInt(e.target.value); if(camera) camera.updateProjectionMatrix(); };
+    
+    // ✅ SPECTER COMMAND: Emergency Bypass (Task 1)
+    // Force the Start Chapter 1 button to be clickable regardless of AI server status
+    const startBtn = document.getElementById('btn-story-start');
+    if (startBtn) {
+        startBtn.style.pointerEvents = 'auto'; // Force it to be clickable
+        startBtn.disabled = false; // Ensure it's not disabled
+        console.log('[System] ✅ Hard-Start Override: btn-story-start forced to clickable state');
+    }
     
     showScreen('main'); // Show main menu
     console.log('[Core Game] UI initialized - showScreen(main) called');
@@ -1625,55 +1682,86 @@ function setupWeapon() {
     // ✅ Initialize projectile pool
     initProjectiles();
     
-    weaponMesh = new THREE.Group();
-    const darkMetal = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.8, roughness: 0.2 });
-    const blackPlastic = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.8 });
+    // Global variables for animation
+    window.gunMixer = null; 
+    window.gunActions = {};
     
-    // ✅ Try to load GLTF model (optional enhancement)
-    // Fallback to procedural weapon if model not found
-    const receiver = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.08, 0.25), darkMetal);
-    weaponMesh.add(receiver);
-    
-    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.5, 16), darkMetal);
-    barrel.rotation.x = Math.PI / 2;
-    barrel.position.set(0, 0.01, -0.35);
-    weaponMesh.add(barrel);
-    
-    const handguard = new THREE.Mesh(new THREE.BoxGeometry(0.065, 0.07, 0.3), blackPlastic);
-    handguard.position.set(0, 0.01, -0.28);
-    weaponMesh.add(handguard);
-    
-    const stockStrut = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.2), darkMetal);
-    stockStrut.position.set(0, -0.01, 0.2);
-    weaponMesh.add(stockStrut);
-    
-    const stockButt = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.12, 0.05), blackPlastic);
-    stockButt.position.set(0, -0.02, 0.3);
-    weaponMesh.add(stockButt);
-    
-    const grip = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.12, 0.06), blackPlastic);
-    grip.rotation.x = -0.3;
-    grip.position.set(0, -0.08, 0.05);
-    weaponMesh.add(grip);
-    
-    const mag = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.15, 0.07), darkMetal);
-    mag.rotation.x = 0.2;
-    mag.position.set(0, -0.1, -0.05);
-    weaponMesh.add(mag);
-    
-    const sightBase = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.02, 0.1), darkMetal);
-    sightBase.position.set(0, 0.05, -0.05);
-    weaponMesh.add(sightBase);
-    
-    muzzleFlashMesh = new THREE.Mesh(new THREE.IcosahedronGeometry(0.1, 0), new THREE.MeshBasicMaterial({ color: 0xffdd00, transparent: true, opacity: 0 }));
-    muzzleFlashMesh.position.set(0, 0.01, -0.65); 
-    weaponMesh.add(muzzleFlashMesh);
-    
-    muzzleFlashPoint = new THREE.PointLight(0xffaa00, 0, 10); 
-    muzzleFlashPoint.position.set(0, 0.01, -0.6); 
-    weaponMesh.add(muzzleFlashPoint);
-    
-    weaponPivot.add(weaponMesh);
+    const loader = new GLTFLoader();
+    loader.load('./models/FpsRig.glb', (gltf) => {
+        const gun = gltf.scene;
+        
+        // Reference Transforms
+        gun.scale.set(0.08, 0.08, 0.08);
+        gun.rotation.set(0, Math.PI / 2, 0); // Correct orientation
+        gun.position.set(0, 0, 0); // Centered in pivot
+        
+        // Add to existing pivot
+        weaponPivot.add(gun);
+        
+        // Setup Animation
+        window.gunMixer = new AnimationMixer(gun);
+        gltf.animations.forEach((clip) => {
+            window.gunActions[clip.name] = window.gunMixer.clipAction(clip);
+        });
+        
+        // Start Idle
+        if (window.gunActions['Armature|Idle']) {
+            window.gunActions['Armature|Idle'].play();
+        }
+        
+        console.log('[Visuals] AKM Rig Loaded & Animated');
+    }, undefined, (error) => {
+        console.error('[Visuals] Error loading FpsRig.glb:', error);
+        // Fallback to procedural weapon if model not found
+        weaponMesh = new THREE.Group();
+        const darkMetal = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.8, roughness: 0.2 });
+        const blackPlastic = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.8 });
+        
+        const receiver = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.08, 0.25), darkMetal);
+        weaponMesh.add(receiver);
+        
+        const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.5, 16), darkMetal);
+        barrel.rotation.x = Math.PI / 2;
+        barrel.position.set(0, 0.01, -0.35);
+        weaponMesh.add(barrel);
+        
+        const handguard = new THREE.Mesh(new THREE.BoxGeometry(0.065, 0.07, 0.3), blackPlastic);
+        handguard.position.set(0, 0.01, -0.28);
+        weaponMesh.add(handguard);
+        
+        const stockStrut = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.2), darkMetal);
+        stockStrut.position.set(0, -0.01, 0.2);
+        weaponMesh.add(stockStrut);
+        
+        const stockButt = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.12, 0.05), blackPlastic);
+        stockButt.position.set(0, -0.02, 0.3);
+        weaponMesh.add(stockButt);
+        
+        const grip = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.12, 0.06), blackPlastic);
+        grip.rotation.x = -0.3;
+        grip.position.set(0, -0.08, 0.05);
+        weaponMesh.add(grip);
+        
+        const mag = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.15, 0.07), darkMetal);
+        mag.rotation.x = 0.2;
+        mag.position.set(0, -0.1, -0.05);
+        weaponMesh.add(mag);
+        
+        const sightBase = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.02, 0.1), darkMetal);
+        sightBase.position.set(0, 0.05, -0.05);
+        weaponMesh.add(sightBase);
+        
+        muzzleFlashMesh = new THREE.Mesh(new THREE.IcosahedronGeometry(0.1, 0), new THREE.MeshBasicMaterial({ color: 0xffdd00, transparent: true, opacity: 0 }));
+        muzzleFlashMesh.position.set(0, 0.01, -0.65); 
+        weaponMesh.add(muzzleFlashMesh);
+        
+        muzzleFlashPoint = new THREE.PointLight(0xffaa00, 0, 10); 
+        muzzleFlashPoint.position.set(0, 0.01, -0.6); 
+        weaponMesh.add(muzzleFlashPoint);
+        
+        weaponPivot.add(weaponMesh);
+        console.log('[Visuals] Fallback procedural weapon loaded');
+    });
 }
 
 // --- MINIMAP LOGIC ---
@@ -2508,9 +2596,22 @@ function tryShoot() {
     player.recoilY += 0.011 * recMult * swayMult; 
     player.recoilX += (Math.random() - 0.5) * 0.005 * recMult * swayMult;
     
-    muzzleFlashPoint.intensity = 15; muzzleFlashMesh.material.opacity = 1; weaponMesh.position.z += 0.08; 
-    const startPos = new THREE.Vector3(); muzzleFlashMesh.getWorldPosition(startPos);
-    const shootDir = new THREE.Vector3(0, 0, -1).applyQuaternion(weaponMesh.getWorldQuaternion(new THREE.Quaternion()));
+    if (muzzleFlashPoint && muzzleFlashMesh) {
+        muzzleFlashPoint.intensity = 15;
+        muzzleFlashMesh.material.opacity = 1;
+    }
+    if (weaponMesh && weaponMesh.position) {
+        weaponMesh.position.z += 0.08;
+    } 
+    const startPos = new THREE.Vector3();
+    if (muzzleFlashMesh) {
+        muzzleFlashMesh.getWorldPosition(startPos);
+    } else {
+        // Fallback to weapon pivot position if muzzle mesh not available
+        weaponPivot.getWorldPosition(startPos);
+    }
+    const shootDir = new THREE.Vector3(0, 0, -1).applyQuaternion(weaponMesh ? weaponMesh.getWorldQuaternion(new THREE.Quaternion()) : new THREE.Quaternion());
+
     const ray = new THREE.Raycaster(startPos, shootDir);
     
     const targets = [...aiUnits.map(u => u.mesh), ...objects];
@@ -2722,6 +2823,11 @@ function animate() {
     
     const delta = Math.min(clock.getDelta(), 0.05);
     
+    // Update weapon animation mixer
+    if (window.gunMixer) {
+        window.gunMixer.update(delta);
+    }
+    
     // Frame counter for debugging
     window.frameCount = (window.frameCount || 0) + 1;
     if (window.frameCount % 30 === 0) {
@@ -2729,7 +2835,21 @@ function animate() {
         if (debugEl) debugEl.innerHTML += `<br>[FPS: ${Math.round(1/delta)}] [F: ${window.frameCount}]`;
     }
     
-    updatePhysics(delta);
+    // ✅ Task 3: Titanium Physics - Sub-stepped collision detection (10x per frame)
+    const PHYSICS_STEPS = 10; // Check collisions 10x per frame for precision
+    for (let i = 0; i < PHYSICS_STEPS; i++) {
+        updatePhysics(delta / PHYSICS_STEPS);
+    }
+    
+    // ✅ Safety Net: Prevent player from falling into the void
+    if (cameraRig && cameraRig.position.y < -5) {
+        console.warn('[Physics] Player fell below world - teleporting to spawn (0, 1.6, 5)');
+        cameraRig.position.set(0, 1.6, 5);
+        player.velocity.set(0, 0, 0);
+        if (window.updateDialogue) {
+            window.updateDialogue('SYSTEM: Position reset. Falling damage avoided.');
+        }
+    }
     
     updateAI(delta);
     
@@ -2760,22 +2880,75 @@ function animate() {
         }
         cameraRig.rotation.y = player.yaw; 
         
-        player.adsFactor = THREE.MathUtils.lerp(player.adsFactor, player.isAiming ? 1 : 0, delta * 12);
-        // ✅ Adjusted base positions to match new weapon rig (0.2, -0.3, -0.5)
-        const basePosX = THREE.MathUtils.lerp(0.2, 0.0, player.adsFactor);
-        let basePosY = THREE.MathUtils.lerp(-0.3, -0.15, player.adsFactor);
+        // --- 1. ADS LOGIC (Smooth Aiming with Iron Sights) ---
+        const targetPos = player.isAiming ? WEAPON_POS.ADS : WEAPON_POS.HIP;
+        const targetFOV = player.isAiming ? WEAPON_POS.ADS_FOV : WEAPON_POS.HIP_FOV;
+        
+        // Smoothly interpolate weapon position and camera FOV with spring physics
+        if (weaponPivot) {
+            // ✅ Task 2: Spring-based inertia for organic weapon movement
+            // Calculate spring force based on current vs target position
+            const springForce = new THREE.Vector3();
+            springForce.subVectors(targetPos, gunSpring.pos);
+            springForce.multiplyScalar(gunSpring.stiffness);
+            
+            // Apply damping to velocity
+            gunSpring.vel.multiplyScalar(1 - gunSpring.damping * delta);
+            
+            // Apply spring force to velocity
+            gunSpring.vel.addScaledVector(springForce, delta);
+            
+            // Update spring position
+            gunSpring.pos.addScaledVector(gunSpring.vel, delta);
+            
+            // Apply to the actual pivot
+            weaponPivot.position.copy(gunSpring.pos);
+        }
+        if (camera) {
+            camera.fov = THREE.MathUtils.lerp(camera.fov, targetFOV, 15 * delta);
+            camera.updateProjectionMatrix();
+        }
+        
+        // --- 2. MOVEMENT ANIMATION LOGIC (Dynamic Animations) ---
+        if (window.gunActions && window.gunMixer) {
+            // Calculate horizontal movement speed (ignore vertical velocity)
+            const speed = new THREE.Vector2(player.velocity.x, player.velocity.z).length();
+            
+            // Determine target animation based on movement speed
+            let targetAnim = 'Armature|Idle';
+            if (speed > 6) {
+                targetAnim = 'Armature|Run';       // Sprinting/fast movement
+            } else if (speed > 0.5) {
+                targetAnim = 'Armature|Walk';      // Walking
+            }
+            
+            // Smoothly transition animations
+            if (currentGunAnim !== targetAnim && window.gunActions[targetAnim]) {
+                const prevAction = window.gunActions[currentGunAnim];
+                const nextAction = window.gunActions[targetAnim];
+                
+                if (prevAction && nextAction) {
+                    nextAction.reset().play();
+                    prevAction.crossFadeTo(nextAction, 0.2, true);  // 0.2s smooth blend
+                    currentGunAnim = targetAnim;
+                    console.log('[Weapon] Animation: ' + targetAnim + ' (Speed: ' + speed.toFixed(2) + ')');
+                }
+            }
+        }
+        
+        // --- 3. RELOAD ANIMATION & HANDLING ---
         if (player.isReloading) {
             player.reloadTimer -= delta;
-            basePosY -= Math.sin((player.reloadTimer / SETTINGS.RELOAD_TIME) * Math.PI) * 0.8;
             if (player.reloadTimer <= 0) {
                 player.isReloading = false;
                 const needed = SETTINGS.MAG_SIZE - player.ammo;
                 const taken = Math.min(needed, player.reserveAmmo);
-                player.ammo += taken; player.reserveAmmo -= taken;
+                player.ammo += taken;
+                player.reserveAmmo -= taken;
                 updateHUDAmmo();
+                console.log('[Weapon] Reload complete. Ammo: ' + player.ammo + '/' + player.reserveAmmo);
             }
         }
-        weaponPivot.position.set(basePosX, basePosY, -0.5); // ✅ Updated Z to -0.5
         
         player.fireTimer -= delta;
         if (player.burstCount > 0) {
@@ -2811,15 +2984,31 @@ function animate() {
         else { m.lArm.rotation.x = THREE.MathUtils.lerp(m.lArm.rotation.x, 0, 0.1); m.rArm.rotation.x = THREE.MathUtils.lerp(m.rArm.rotation.x, 0, 0.1); m.lLeg.rotation.x = THREE.MathUtils.lerp(m.lLeg.rotation.x, 0, 0.1); m.rLeg.rotation.x = THREE.MathUtils.lerp(m.rLeg.rotation.x, 0, 0.1); }
     }
     
-    muzzleFlashPoint.intensity *= 0.4; muzzleFlashMesh.material.opacity *= 0.4;
-    weaponMesh.position.z = THREE.MathUtils.lerp(weaponMesh.position.z, 0, delta * 15);
+    // ✅ MASTER SAFETY WRAPPER (Task 2) - Fix intensity crashes
+    if (muzzleFlashPoint && muzzleFlashPoint.intensity !== undefined) {
+        muzzleFlashPoint.intensity *= 0.4;
+    }
+    if (muzzleFlashMesh && muzzleFlashMesh.material) {
+        muzzleFlashMesh.material.opacity *= 0.4;
+    }
+    if (weaponMesh && weaponMesh.position) {
+        weaponMesh.position.z = THREE.MathUtils.lerp(weaponMesh.position.z, 0, delta * 15);
+    }
     
     for (let i = tracers.length - 1; i >= 0; i--) {
-        const t = tracers[i]; t.t += delta * SETTINGS.TRACER_SPEED; t.mesh.position.copy(t.start.clone().lerp(t.end, Math.min(1.0, t.t / t.dist)));
+        const t = tracers[i];
+        if (!t || !t.mesh || !t.mesh.material) continue; // ✅ Safety check
+        t.t += delta * SETTINGS.TRACER_SPEED;
+        t.mesh.position.copy(t.start.clone().lerp(t.end, Math.min(1.0, t.t / t.dist)));
         if (t.t >= t.dist) { t.mesh.material.opacity -= delta * 10; if (t.mesh.material.opacity <= 0) { scene.remove(t.mesh); tracers.splice(i, 1); } }
     }
     for (let i = particles.length - 1; i >= 0; i--) {
-        const p = particles[i]; p.life -= delta * 2.5; p.vel.add(p.gravity); p.mesh.position.add(p.vel); p.mesh.scale.setScalar(p.life);
+        const p = particles[i];
+        if (!p || !p.mesh) continue; // ✅ Safety check
+        p.life -= delta * 2.5;
+        p.vel.add(p.gravity);
+        p.mesh.position.add(p.vel);
+        p.mesh.scale.setScalar(p.life);
         if (p.life <= 0) { scene.remove(p.mesh); particles.splice(i, 1); }
     }
     
@@ -2858,8 +3047,39 @@ function animate() {
         }
     }
     
+    // --- FABRICATION LOOP ---
+    if (window.isFabricationMode) {
+        // Lock grid to player position (X/Z only, Y stays at floor)
+        if (window.editorGrid && cameraRig) {
+            window.editorGrid.position.set(cameraRig.position.x, 0, cameraRig.position.z);
+        }
+    } else {
+        // Passive Energy Regen (when not in fabrication mode)
+        if (window.fabricationEnergy < window.maxFabricationEnergy) {
+            window.fabricationEnergy += 5 * delta;
+        }
+    }
+    
+    // --- UI BINDING (Specter Command) ---
+    if (document.getElementById('hud-visor') && document.getElementById('hud-visor').style.display === 'block') {
+        const hpBar = document.getElementById('health-bar-fill');
+        const enBar = document.getElementById('energy-bar-fill');
+        const ammoText = document.getElementById('current-ammo');
+        const reserveText = document.getElementById('reserve-ammo');
+        const fireMode = document.getElementById('fire-mode');
+        
+        if (hpBar) hpBar.style.width = ((player.health || 100) / player.maxHealth) * 100 + '%';
+        if (enBar) enBar.style.width = Math.min(window.fabricationEnergy, 100) + '%';
+        if (ammoText) ammoText.textContent = player.ammo || 0;
+        if (reserveText) reserveText.textContent = player.reserveAmmo || 0;
+        if (fireMode) fireMode.textContent = (SETTINGS.FIRE_MODES[player.fireModeIndex] || 'AUTO');
+    }
+    
     // Render the scene
     if (window.frameCount % 300 === 0) console.log('[animate] Rendering frame', window.frameCount, 'scene children:', scene.children.length);
+    
+    // ✅ Task 3: Viewmodel Depth Fix - Ensure weapon always renders on top
+    renderer.clearDepth();
     renderer.render(scene, activeCamera);
 }
 
@@ -3092,6 +3312,9 @@ window.switchEditorTab = function(tab) {
 };
 
 window.toggleEditor = function() {
+    // Call the new Fabrication Mode toggle
+    toggleFabricationMode();
+    
     const overlay = document.getElementById('editor-overlay');
     if (!overlay) return;
     const isActive = overlay.classList.contains('active');
@@ -3104,6 +3327,35 @@ window.toggleEditor = function() {
     }
     window.editorActive = !isActive;
 };
+
+function toggleFabricationMode() {
+    window.isFabricationMode = !window.isFabricationMode;
+    console.log('[System] Fabrication Mode:', window.isFabricationMode ? 'ONLINE' : 'OFFLINE');
+    
+    if (window.isFabricationMode) {
+        // 1. Apply Cyan Tint (Hologram Effect)
+        scene.fog.color.setHex(0x004444);
+        scene.background.setHex(0x002222);
+        console.log('[Visuals] Hologram visor activated - Cyan aesthetics applied');
+        
+        // 2. Spawn Holo-Grid
+        if (!window.editorGrid) {
+            window.editorGrid = new THREE.GridHelper(40, 40, 0x00ffff, 0x003333);
+            scene.add(window.editorGrid);
+            console.log('[Grid] Holographic grid spawned');
+        }
+        window.editorGrid.visible = true;
+        document.getElementById('hud-visor').style.display = 'block';
+    } else {
+        // Restore Tactical Day visual theme
+        scene.fog.color.setHex(0x87CEEB);
+        scene.background.setHex(0x87CEEB);
+        console.log('[Visuals] Tactical theme restored');
+        
+        if (window.editorGrid) window.editorGrid.visible = false;
+        document.getElementById('hud-visor').style.display = 'none';
+    }
+}
 
 window.editorSpawn = function(type) {
     if (!scene || !camera) return;
@@ -3721,6 +3973,62 @@ if (!window.wallRunUpdateHooked) {
     };
 }
 
+// --- MODULE EXPORTS (Fix for HTML Buttons) ---
+// Expose core functions to global scope for HTML onclick handlers
+window.launchGame = launchGame;
+window.startMode = startMode;
+// Ensure the Global Handshake variables are still robust
+window.isGameActive = false; 
+console.log('[Core] ✅ Module loaded. Functions exposed to window.');
 
+// ✅ SPECTER COMMAND: Diegetic Bridge - Legacy Compatibility Layer
+window.updateDialogue = function(text) {
+    const hudBox = document.getElementById('objective-text');
+    const hudHeader = document.querySelector('.hud-header');
+
+    if (hudBox) {
+        hudBox.style.opacity = '0';
+        // Add tactical prefix and force uppercase for the "Specter" feel
+        hudBox.innerText = `>> DATA INCOMING: ${text.toUpperCase()}`;
+        setTimeout(() => { hudBox.style.opacity = '1'; }, 50);
+    }
+    // Add a "Glitch" effect to the ARIA link header when she speaks
+    if (hudHeader) {
+        const original = "[ ARIA LINK ESTABLISHED ]";
+        hudHeader.innerText = "[ ARIA TRANSMITTING... ]";
+        hudHeader.style.color = "#FF9900"; // Alert Orange
+        setTimeout(() => { 
+            hudHeader.innerText = original; 
+            hudHeader.style.color = "#00E5FF"; 
+        }, 1500);
+    }
+    console.log('%c[ARIA]: ' + text, 'color: #00E5FF; font-weight: bold;');
+    
+    // ✅ Task 4: Diegetic Sound Bridge - Electronic Chirp for ARIA transmissions
+    if (window.audioCtx) {
+        try {
+            const now = window.audioCtx.currentTime;
+            const chirpOsc = window.audioCtx.createOscillator();
+            const chirpGain = window.audioCtx.createGain();
+            
+            chirpOsc.type = 'sine';
+            chirpOsc.frequency.setValueAtTime(800, now);
+            chirpOsc.frequency.linearRampToValueAtTime(1200, now + 0.1);
+            
+            chirpGain.gain.setValueAtTime(0.1, now);
+            chirpGain.gain.linearRampToValueAtTime(0, now + 0.15);
+            
+            chirpOsc.connect(chirpGain);
+            chirpGain.connect(window.masterGain || window.audioCtx.destination);
+            
+            chirpOsc.start(now);
+            chirpOsc.stop(now + 0.15);
+            
+            console.log('[Audio] 🔊 ARIA chirp transmitted');
+        } catch (e) {
+            console.warn('[Audio] ⚠️ Chirp failed:', e.message);
+        }
+    }
+};
 
 })(); // CLOSE THE IIFE - CRITICAL!

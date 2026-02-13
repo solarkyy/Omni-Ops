@@ -37,9 +37,9 @@ const ModuleLoader = {
             this.updateModuleStatus(module.name, 'loading');
             this.updateStatus(`Loading ${module.name}...`);
             const script = document.createElement('script');
+            script.type = 'module'; // ✅ CRITICAL FIX: Enable ES6 module support for import statements
             script.src = module.file;
             script.async = false;
-            script.type = 'text/javascript';
             
             let loaded = false;
             
@@ -98,7 +98,10 @@ const ModuleLoader = {
     },
     updateProgress: function () {
         const percent = (this.loaded / this.total) * 100;
-        document.getElementById('loading-bar').style.width = percent + '%';
+        const bar = document.getElementById('loading-bar');
+        if (bar && bar.style) {
+            bar.style.width = percent + '%';
+        }
     },
     updateStatus: function (text) {
         const statusEl = document.getElementById('loading-status');
@@ -135,7 +138,10 @@ const ModuleLoader = {
         
         setTimeout(() => {
             try {
-                document.getElementById('loading-screen').classList.add('hidden');
+                const loadingScreen = document.getElementById('loading-screen');
+                if (loadingScreen) {
+                    loadingScreen.classList.add('hidden');
+                }
                 window.modulesReady = true;
                 console.log('[ModuleLoader] Setting modulesReady = true');
                 
@@ -151,7 +157,10 @@ const ModuleLoader = {
                             console.error('[ModuleLoader] Error calling initializeUI:', initErr);
                             if (initErr.stack) console.error(initErr.stack);
                             // Force show menu as fallback
-                            document.getElementById('menu-overlay').style.display = 'flex';
+                            const menuOverlay = document.getElementById('menu-overlay');
+                            if (menuOverlay) {
+                                menuOverlay.style.display = 'flex';
+                            }
                         }
                     } else {
                         attempts++;
@@ -185,7 +194,10 @@ const ModuleLoader = {
                 console.error('[ModuleLoader] Error in complete():', err, err.stack);
                 // Force show menu as fallback
                 try {
-                    document.getElementById('menu-overlay').style.display = 'flex';
+                    const menuOverlay = document.getElementById('menu-overlay');
+                    if (menuOverlay) {
+                        menuOverlay.style.display = 'flex';
+                    }
                 } catch(e) {}
             }
         }, 500);
