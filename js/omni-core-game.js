@@ -25,21 +25,53 @@
     // ✅ Task 2: Assign THREE globally to prevent Multiple Three warning
     window.THREE = THREE;
 
+const CONFIG_MASTER = window.CONFIG_MASTER || window.CONFIG || {};
+const CORE_SETTINGS = CONFIG_MASTER.core_game_settings || {};
+const PLAYER_CONTROLS = CORE_SETTINGS.player_controls || {};
+const CAMERA_SETTINGS = CORE_SETTINGS.camera || {};
+const COMBAT_SETTINGS = CORE_SETTINGS.combat || {};
+const PLAYER_STATE = CORE_SETTINGS.player_state || {};
+const WORLD_SETTINGS = CORE_SETTINGS.world || {};
+const NETWORK_SETTINGS = CORE_SETTINGS.network || {};
+const PERSISTENCE_SETTINGS = CORE_SETTINGS.persistence || {};
+const PHYSICS_SETTINGS = CORE_SETTINGS.physics || {};
+const UI_SETTINGS = CORE_SETTINGS.ui_updates || {};
+const PHYSICS_REGISTRY = CONFIG_MASTER.physics || {};
+
 const SETTINGS = {
-    MOUSE_SENSE: 0.002, ADS_SENSE_MULT: 0.5, ACCEL: 130, FRICTION: 12,
-    MAX_WALK: 8, MAX_SPRINT: 28, MAX_ADS: 3.5, MAX_CROUCH: 4,
-    JUMP_POWER: 11, GRAVITY: 35,
-    RELOAD_TIME: 1.8, MAG_SIZE: 30, START_RESERVE: 90,
-    FIRE_MODES: ['AUTO', 'BURST', 'SINGLE'],
-    FIRE_RATE: 0.1, BURST_DELAY: 0.08,
-    FOV_BASE: 85, FOV_ADS: 50, FOV_SPRINT: 105,
-    TRACER_SPEED: 320, NET_UPDATE_RATE: 50, MASTER_VOL: 1.0,
-    HIFI: true, PLAYER_RADIUS: 0.5, COMMANDER_SPEED: 40,
-    INTERACT_DIST: 5.0, TILE_SIZE: 12, WORLD_TILES: 50,
-    TIME_SCALE: 0.02, 
-    BODY_DECAY_TIME: 1200000,
-    MAX_DELTA: 0.05,
-    PHYSICS_STEPS: 10
+    MOUSE_SENSE: PLAYER_CONTROLS.mouse_sensitivity ?? 0.002,
+    ADS_SENSE_MULT: PLAYER_CONTROLS.ads_sensitivity_multiplier ?? 0.5,
+    ACCEL: PLAYER_CONTROLS.movement_acceleration ?? 130,
+    FRICTION: PLAYER_CONTROLS.movement_friction ?? 12,
+    MAX_WALK: PLAYER_CONTROLS.max_walk_speed ?? 8,
+    MAX_SPRINT: PLAYER_CONTROLS.max_sprint_speed ?? 28,
+    MAX_ADS: PLAYER_CONTROLS.max_ads_speed ?? 3.5,
+    MAX_CROUCH: PLAYER_CONTROLS.max_crouch_speed ?? 4,
+    JUMP_POWER: PLAYER_CONTROLS.jump_force ?? 11,
+    GRAVITY: WORLD_SETTINGS.gravity ?? PHYSICS_REGISTRY.gravity ?? 35,
+    RELOAD_TIME: COMBAT_SETTINGS.reload_time_seconds ?? 1.8,
+    MAG_SIZE: COMBAT_SETTINGS.magazine_size ?? 30,
+    START_RESERVE: COMBAT_SETTINGS.starting_reserve_ammo ?? 90,
+    FIRE_MODES: COMBAT_SETTINGS.fire_modes ?? ['AUTO', 'BURST', 'SINGLE'],
+    FIRE_RATE: COMBAT_SETTINGS.fire_rate_seconds ?? 0.1,
+    BURST_DELAY: COMBAT_SETTINGS.burst_delay_seconds ?? 0.08,
+    FOV_BASE: CAMERA_SETTINGS.base_fov ?? 85,
+    FOV_ADS: CAMERA_SETTINGS.ads_fov ?? 50,
+    FOV_SPRINT: CAMERA_SETTINGS.sprint_fov ?? 105,
+    TRACER_SPEED: COMBAT_SETTINGS.tracer_speed ?? 320,
+    NET_UPDATE_RATE: NETWORK_SETTINGS.net_update_rate_hz ?? 50,
+    MASTER_VOL: NETWORK_SETTINGS.master_volume ?? 1.0,
+    HIFI: NETWORK_SETTINGS.hifi_audio_enabled ?? true,
+    PLAYER_RADIUS: PLAYER_STATE.player_radius ?? 0.5,
+    COMMANDER_SPEED: WORLD_SETTINGS.commander_speed ?? 40,
+    INTERACT_DIST: WORLD_SETTINGS.interact_distance ?? 5.0,
+    TILE_SIZE: WORLD_SETTINGS.world_tile_size ?? 12,
+    WORLD_TILES: WORLD_SETTINGS.world_tile_count ?? 50,
+    TIME_SCALE: CORE_SETTINGS.time_scale ?? 0.02,
+    BODY_DECAY_TIME: WORLD_SETTINGS.body_decay_time_ms ?? 1200000,
+    MAX_DELTA: ((PHYSICS_SETTINGS.max_delta_clamped_ms ?? PHYSICS_REGISTRY.max_delta_ms ?? 50) / 1000),
+    PHYSICS_STEPS: PHYSICS_SETTINGS.physics_sub_steps ?? PHYSICS_REGISTRY.sub_steps ?? 10,
+    POINTER_LOCK_RETRY_DELAY_MS: UI_SETTINGS.pointer_lock_retry_delay_ms ?? 100
 };
 // --- CENTRALIZED GAME STATE ---
 const gameState = {
@@ -181,6 +213,19 @@ function onResize() {
 
 // --- CORE FUNCTIONS (Moved up for scope safety) ---
 
+function resolveChapter1SpawnPosition() {
+    const registry = window.CONFIG_MASTER || window.CONFIG || {};
+    const chapter = registry.chapter1 || registry.chapter_1 || registry.story || {};
+    const spawn = chapter.player_start_position || chapter.playerStartPosition || registry.player_start_position;
+
+    if (spawn && Number.isFinite(spawn.x) && Number.isFinite(spawn.y) && Number.isFinite(spawn.z)) {
+        return spawn;
+    }
+
+    console.warn('[Spawn] Missing Chapter 1 player_start_position in CONFIG_MASTER', { hasChapterConfig: !!chapter });
+    return { x: 0, y: player.eyeLevel ?? 1.6, z: 5 };
+}
+
 function initGame() {
     console.log('[initGame] Starting...');
     try {
@@ -236,7 +281,8 @@ function initGame() {
         
         // ✅ PLAYER RIG - Replaces cameraRig with Object3D for proper FPS movement
         const playerRig = new THREE.Object3D();
-        playerRig.position.set(0, 1.6, 5); // ✅ Fix the void - start above ground at eye level
+        const spawnPos = resolveChapter1SpawnPosition();
+        playerRig.position.set(spawnPos.x, spawnPos.y, spawnPos.z);
         cameraRig = playerRig; // Keep cameraRig reference for compatibility
         
         console.log('[initGame] Player rig positioned at:', playerRig.position);
@@ -302,8 +348,13 @@ function initGame() {
         console.log('[initGame] Chapter 1 initialization...');
         if (typeof window.initializeChapter1Story === 'function') {
             window.initializeChapter1Story();
+        } else if (window.GameStory && typeof window.GameStory.startChapter === 'function') {
+            window.GameStory.startChapter(1);
         } else {
-            console.error('[initGame] Chapter 1 initializer missing', { hasInit: typeof window.initializeChapter1Story });
+            console.error('[initGame] Chapter 1 initializer missing', {
+                hasInit: typeof window.initializeChapter1Story,
+                hasGameStory: !!window.GameStory
+            });
         }
         
         console.log('[initGame] Setting up weapon...');
@@ -383,6 +434,8 @@ function onSinglePlayerWorldReady() {
                         // Explicit story startup - orchestrates objectives and VO with clear logging
                         if (typeof window.initializeChapter1Story === 'function') {
                             window.initializeChapter1Story();
+                        } else if (window.GameStory && typeof window.GameStory.startChapter === 'function') {
+                            window.GameStory.startChapter(1);
                         } else {
                             console.error('[World] Story initialization function not available');
                         }
@@ -1512,184 +1565,9 @@ function handleNetworkData(data, senderId) {
     }
 }
 
-// --- WORLD GENERATION (ZONAL) ---
-function generateWorld(seed) {
-    if (window.OMNI_OPS_STORY_MODE === 'CHAPTER1') {
-        console.log('[World] Skipping generateWorld for Chapter 1 story mode');
-        return;
-    }
-    objects.forEach(obj => scene.remove(obj));
-    objects = [];
-    
-    const tileS = SETTINGS.TILE_SIZE;
-    const tilesInAxis = 60;
-    
-    const pseudoRandom = (x, z) => {
-        const val = Math.sin(seed + x * 12.9898 + z * 78.233);
-        return (val - Math.floor(val));
-    };
-
-    // Fable-style materials
-    const grassMat = new THREE.MeshStandardMaterial({ color: 0x2d5016, roughness: 0.8 });
-    const pathMat = new THREE.MeshStandardMaterial({ color: 0x6b5d4f }); 
-    const stoneMat = new THREE.MeshStandardMaterial({ color: 0x4a4a4a });
-    const woodMat = new THREE.MeshStandardMaterial({ color: 0x664422, roughness: 0.7 });
-    const treeMat = new THREE.MeshStandardMaterial({ color: 0x1a331a, roughness: 0.9 });
-
-    // Create village square paths (radial from center)
-    for (let i = 0; i < 4; i++) {
-        const angle = (i * Math.PI / 2);
-        for (let d = 0; d < 60; d += 1) {
-            const pathX = Math.cos(angle) * d * tileS;
-            const pathZ = Math.sin(angle) * d * tileS;
-            const path = new THREE.Mesh(new THREE.BoxGeometry(tileS * 0.8, 0.1, tileS * 0.8), pathMat);
-            path.position.set(pathX, 0.05, pathZ);
-            path.receiveShadow = true;
-            scene.add(path);
-            objects.push(path);
-        }
-    }
-
-    // Perimeter stone wall (village boundary)
-    const wallMat = new THREE.MeshStandardMaterial({ color: 0x5a5a5a });
-    const wallPositions = [];
-    for (let d = 70; d < 100; d += 5) {
-        for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 16) {
-            wallPositions.push({ x: Math.cos(angle) * d * tileS, z: Math.sin(angle) * d * tileS });
-        }
-    }
-    wallPositions.forEach(pos => {
-        const wall = new THREE.Mesh(new THREE.BoxGeometry(4, 6, 4), wallMat);
-        wall.position.set(pos.x, 3, pos.z);
-        wall.castShadow = true;
-        wall.receiveShadow = true;
-        scene.add(wall);
-        objects.push(wall);
-    });
-
-    // Core village buildings (already defined in living world module)
-    createCitadelBuilding("HOSPITAL", 0, -25, 0xdddddd, 0xff0000);
-    createCitadelBuilding("ARMORY", 0, 25, 0x444444, 0xffff00);
-    createCitadelBuilding("HQ", -25, 0, 0x3333aa, 0x00ffff);
-    createCitadelBuilding("BARRACKS", 25, 0, 0x555533, 0x00ff00);
-
-    // Forest outside village
-    for (let x = -tilesInAxis; x < tilesInAxis; x++) {
-        for (let z = -tilesInAxis; z < tilesInAxis; z++) {
-            const wX = x * tileS; 
-            const wZ = z * tileS;
-            const dist = Math.sqrt(wX*wX + wZ*wZ);
-            const val = pseudoRandom(x, z);
-
-            // Skip city center
-            if (dist < 35) continue;
-            
-            // Village outskirts
-            if (dist >= 35 && dist < 100) {
-                if (val > 0.88) {
-                    const h = 6 + (val * 12);
-                    const tree = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 2.5, h, 12), treeMat);
-                    tree.position.set(wX, h/2, wZ);
-                    tree.castShadow = true;
-                    scene.add(tree);
-                    objects.push(tree);
-                } else if (val > 0.75 && Math.random() > 0.7) {
-                    // Small cottage
-                    const house = new THREE.Mesh(new THREE.BoxGeometry(8, 6, 8), woodMat);
-                    house.position.set(wX, 3, wZ);
-                    house.castShadow = true;
-                    scene.add(house);
-                    objects.push(house);
-                }
-            }
-            // Deep forest and wilderness
-            else if (dist >= 100) {
-                if (val > 0.85) {
-                    const h = 8 + (val * 14);
-                    const tree = new THREE.Mesh(new THREE.CylinderGeometry(2, 3, h, 16), treeMat);
-                    tree.position.set(wX, h/2, wZ);
-                    tree.castShadow = true;
-                    scene.add(tree);
-                    objects.push(tree);
-                } else if (val > 0.92 && dist > 120) {
-                    // Wildlife - rocks
-                    const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(3 + val * 4), stoneMat);
-                    rock.position.set(wX, 2, wZ);
-                    rock.castShadow = true;
-                    scene.add(rock);
-                    objects.push(rock);
-                }
-            }
-        }
-    }
-
-    // Add some decorative elements near village center
-    for (let i = 0; i < 8; i++) {
-        const angle = (i / 8) * Math.PI * 2;
-        const r = 45 + Math.random() * 10;
-        const x = Math.cos(angle) * r;
-        const z = Math.sin(angle) * r;
-        
-        // Lantern posts
-        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 4), stoneMat);
-        post.position.set(x, 2, z);
-        post.castShadow = true;
-        scene.add(post);
-        objects.push(post);
-        
-        const light = new THREE.PointLight(0xffaa66, 1, 40);
-        light.position.set(x, 4, z);
-        scene.add(light);
-    }
-}
-
-function createCitadelBuilding(type, x, z, colorHex, signColor) {
-    const mat = new THREE.MeshStandardMaterial({ color: colorHex });
-    const size = 15;
-    const height = 8;
-    
-    const floor = new THREE.Mesh(new THREE.BoxGeometry(size, 0.5, size), mat);
-    floor.position.set(x, 0.25, z);
-    scene.add(floor); objects.push(floor);
-    
-    const roof = new THREE.Mesh(new THREE.BoxGeometry(size, 0.5, size), mat);
-    roof.position.set(x, height, z);
-    scene.add(roof); objects.push(roof);
-    
-    const w1 = new THREE.Mesh(new THREE.BoxGeometry(size, height, 1), mat);
-    w1.position.set(x, height/2, z - size/2); scene.add(w1); objects.push(w1);
-    
-    const w2 = new THREE.Mesh(new THREE.BoxGeometry(1, height, size), mat);
-    w2.position.set(x - size/2, height/2, z); scene.add(w2); objects.push(w2);
-    
-    const w3 = new THREE.Mesh(new THREE.BoxGeometry(1, height, size), mat);
-    w3.position.set(x + size/2, height/2, z); scene.add(w3); objects.push(w3);
-    
-    const canvas = document.createElement('canvas');
-    canvas.width = 256; canvas.height = 64;
-    const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#' + signColor.toString(16).padStart(6,'0');
-    ctx.fillRect(0,0,256,64);
-    ctx.fillStyle = 'black';
-    ctx.font = 'bold 40px Arial';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(type, 128, 32);
-    
-    const tex = new THREE.CanvasTexture(canvas);
-    const sign = new THREE.Mesh(new THREE.PlaneGeometry(8, 2), new THREE.MeshBasicMaterial({ map: tex }));
-    sign.position.set(x, height + 1.5, z + size/2); 
-    if(z > 0) sign.rotation.y = Math.PI; 
-    sign.lookAt(0, height + 1.5, 0);
-    scene.add(sign);
-    
-    if (type === "HOSPITAL") {
-        const bed = new THREE.Mesh(new THREE.BoxGeometry(3, 1, 6), new THREE.MeshStandardMaterial({color:0xffffff}));
-        bed.position.set(x, 1, z); scene.add(bed); objects.push(bed);
-    } else if (type === "ARMORY") {
-        const rack = new THREE.Mesh(new THREE.BoxGeometry(8, 3, 2), new THREE.MeshStandardMaterial({color:0x333333}));
-        rack.position.set(x, 1.5, z - 3); scene.add(rack); objects.push(rack);
-    }
+// --- WORLD GENERATION (LEGACY) ---
+function generateWorld() {
+    console.warn('[World] Legacy procedural world generation disabled (Chapter 1 only)');
 }
 
 function setupLighting() {
