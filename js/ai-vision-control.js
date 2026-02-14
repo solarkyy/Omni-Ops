@@ -23,7 +23,7 @@
             const waitForGame = setInterval(() => {
                 if (window.renderer && window.player) {
                     clearInterval(waitForGame);
-                    this.start();
+                    this.npstart();
                 }
             }, 500);
         },

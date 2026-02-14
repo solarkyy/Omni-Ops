@@ -90,8 +90,8 @@
             {
                 phase: 0,
                 duration: 3,
-                text: "⚡ OMNI-OPS SYSTEM RUNNER",
-                subtitle: "CHAPTER 1: COLD BOOT",
+                text: "CONNECTION ESTABLISHED: MOON SERVER [LUNA-01]",
+                subtitle: "SYSTEM RUNNER BOOT SEQUENCE",
                 camera: { position: [0, 50, -80], lookAt: [0, 5, 0] },
                 bgColor: 0x001a33,
                 textColor: 0x00ffcc,
@@ -101,7 +101,7 @@
                 phase: 1,
                 duration: 4,
                 narrator: true,
-                text: "SYSTEM ALERT: Moon Server Integrity < 40%. The Admin has initiated a sector purge. All non-critical data marked for deletion.",
+                text: "WARNING: SECTOR CORRUPTION CRITICAL. Buffer Zone sectors 7-12 degraded to wireframe. Data integrity failure imminent.",
                 camera: { position: [-40, 30, -50], lookAt: [0, 2, 0] },
                 bgColor: 0x1a0000,
                 textColor: 0xff0000,
@@ -111,7 +111,7 @@
                 phase: 2,
                 duration: 4,
                 narrator: true,
-                text: "The Buffer Zone: A decaying digital simulation where corrupted sectors become unstable. Restoration is the only path forward.",
+                text: "SYSTEM RUNNER ID: ARES... ONLINE. Deploying to restore corrupted sectors. Mission: Stabilize all glitch zones before Admin purge completes.",
                 camera: { position: [40, 35, -60], lookAt: [0, 2, 0] },
                 bgColor: 0x0a1a2a,
                 textColor: 0x00ffff,
@@ -121,7 +121,7 @@
                 phase: 3,
                 duration: 4,
                 narrator: true,
-                text: "Your mission: Restore critical sectors from wireframe corruption. Turn glitch zones into stable, high-resolution safe zones before The Admin completes the purge.",
+                text: "OBJECTIVE: Restore the Buffer Zone. Convert wireframe corruption into high-resolution stable sectors. You are the only System Runner who can prevent total sector collapse.",
                 camera: { position: [40, 35, -60], lookAt: [0, 2, 0] },
                 bgColor: 0x0a2030,
                 textColor: 0x00dd44,
@@ -130,14 +130,15 @@
             {
                 phase: 4,
                 duration: 3,
-                text: "SYSTEM RUNNER ID: ARES",
+                text: "SYSTEM RUNNER ARES",
                 subtitle: "Standing by for deployment...",
                 camera: { position: [0, 50, -80], lookAt: [0, 5, 0] },
                 bgColor: 0x001a33,
                 textColor: 0x00ffcc,
                 effect: "fade_in"
-
-                phase: 3,
+            },
+            {
+                phase: 5,
                 duration: 4,
                 text: "MILLBROOK VILLAGE - Present Day",
                 subtitle: "Where hope is but a fading memory",
@@ -147,7 +148,7 @@
                 effect: "move_closer"
             },
             {
-                phase: 4,
+                phase: 6,
                 duration: 6,
                 narrator: true,
                 text: `"You arrive at Millbrook as autumn winds carry whispers of dread. 
@@ -297,92 +298,33 @@
         },
 
         setupIntroUI: function() {
-            // Create intro screen if not exists
-            if (!document.getElementById('story-intro')) {
+            // [SYSTEM_RUNNER_ALERT] Use hardcoded #intro-text from index.html
+            // No dynamic creation needed - DOM skeleton is guaranteed to exist
+            const introText = document.getElementById('intro-text');
+            if (!introText) {
+                console.warn('[Story::setupIntroUI] #intro-text not found in hardcoded DOM, creating fallback');
+                // Fallback for safety, but this should never happen with hardcoded DOM
                 const introDiv = document.createElement('div');
-                introDiv.id = 'story-intro';
+                introDiv.id = 'intro-text';
                 introDiv.style.cssText = `
-                    position: fixed;
-                    top: 0;
-                    left: 0;
-                    width: 100%;
-                    height: 100%;
-                    display: none;
-                    z-index: 2000;
-                    background: #000;
-                    color: #fff;
-                    font-family: 'Georgia', serif;
-                    flex-direction: column;
-                    align-items: center;
-                    justify-content: center;
-                    opacity: 0;
-                    transition: opacity 0.5s;
-                `;
-                
-                const contentDiv = document.createElement('div');
-                contentDiv.id = 'story-intro-content';
-                contentDiv.style.cssText = `
-                    text-align: center;
-                    max-width: 600px;
-                    animation: fadeInUp 1s ease-out forwards;
-                `;
-                
-                const titleEl = document.createElement('h1');
-                titleEl.id = 'story-title';
-                titleEl.style.cssText = `
-                    font-size: 48px;
-                    margin: 0;
-                    color: #ffd700;
-                    text-shadow: 0 0 20px rgba(255,215,0,0.5);
-                    letter-spacing: 2px;
-                `;
-                
-                const subtitleEl = document.createElement('p');
-                subtitleEl.id = 'story-subtitle';
-                subtitleEl.style.cssText = `
-                    font-size: 18px;
-                    margin-top: 10px;
-                    color: #aaa;
-                    font-style: italic;
-                `;
-                
-                const narrationEl = document.createElement('p');
-                narrationEl.id = 'story-narration';
-                narrationEl.style.cssText = `
-                    font-size: 16px;
-                    margin-top: 40px;
-                    line-height: 1.8;
-                    color: #ddd;
-                    white-space: pre-wrap;
-                `;
-
-                const skipEl = document.createElement('p');
-                skipEl.id = 'story-skip';
-                skipEl.style.cssText = `
                     position: absolute;
-                    bottom: 20px;
-                    right: 20px;
-                    font-size: 12px;
-                    color: #666;
-                    cursor: pointer;
-                    transition: color 0.3s;
+                    top: 120px;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    color: #0f6;
+                    font-size: 16px;
+                    text-align: center;
+                    max-width: 700px;
                 `;
-                safeText(skipEl, '[ Press SPACE to skip ]');
-                skipEl.onmouseover = () => skipEl.style.color = '#aaa';
-                skipEl.onmouseout = () => skipEl.style.color = '#666';
-                skipEl.onclick = () => this.skipIntro();
-
-                contentDiv.appendChild(titleEl);
-                contentDiv.appendChild(subtitleEl);
-                contentDiv.appendChild(narrationEl);
-
-                introDiv.appendChild(contentDiv);
-                introDiv.appendChild(skipEl);
                 document.body.appendChild(introDiv);
-
-                // Add CSS animation
-                const style = document.createElement('style');
-                safeText(style, `
+            }
+            
+            // Add CSS animations if needed
+            const style = document.querySelector('style[data-story-animations]');
+            if (!style) {
+                const animStyle = document.createElement('style');
+                animStyle.setAttribute('data-story-animations', 'true');
+                animStyle.textContent = `
                     @keyframes fadeInUp {
                         from { opacity: 0; transform: translateY(20px); }
                         to { opacity: 1; transform: translateY(0); }
@@ -391,8 +333,8 @@
                         from { opacity: 1; }
                         to { opacity: 0; }
                     }
-                `);
-                document.head.appendChild(style);
+                `;
+                document.head.appendChild(animStyle);
             }
         },
 
@@ -404,7 +346,7 @@
 
             // ✅ AUDIT: Added null guards for menu overlay elements
             const menuOverlay = document.getElementById('menu-overlay');
-            const storyIntro = document.getElementById('story-intro');
+            const storyIntro = document.getElementById('intro-text');  // [SYSTEM_RUNNER_ALERT] Use hardcoded #intro-text
             
             if (menuOverlay) {
                 menuOverlay.style.display = 'none';
@@ -416,7 +358,7 @@
                 storyIntro.style.display = 'flex';
                 storyIntro.style.opacity = '1';
             } else {
-                console.error('[Story::startIntro] story-intro element missing, cannot start intro');
+                console.error('[Story::startIntro] intro-text element missing, cannot start intro');
                 return;
             }
 
@@ -498,17 +440,17 @@
             // Background color transition
             const bgColor = phase.bgColor || 0x000000;
             const bgColorHex = '#' + bgColor.toString(16).padStart(6, '0');
-            const storyIntro = document.getElementById('story-intro');
+            const storyIntro = document.getElementById('intro-text');  // [SYSTEM_RUNNER_ALERT] Use hardcoded #intro-text
             if (storyIntro) {
                 storyIntro.style.background = bgColorHex;
             } else {
-                console.warn('[Story::updateIntro] story-intro element missing, cannot update background');
+                console.warn('[Story::updateIntro] intro-text element missing, cannot update background');
             }
 
             // Camera simulation (text animation)
             if (phase.effect === 'fade_in') {
                 const alpha = Math.min(1, this.introTimer / 1);
-                const introContent = document.getElementById('story-intro-content');
+                const introContent = document.getElementById('intro-text');  // [SYSTEM_RUNNER_ALERT] Use hardcoded #intro-text
                 if (introContent) {
                     introContent.style.opacity = alpha;
                 }
@@ -534,7 +476,7 @@
             this.isPlayingIntro = false;
             this.currentState = StoryState.INTRO_COMPLETE;
             
-            const introDiv = document.getElementById('story-intro');
+            const introDiv = document.getElementById('intro-text');  // [SYSTEM_RUNNER_ALERT] Use hardcoded #intro-text
             if (introDiv) {
                 introDiv.style.opacity = '0';
             }
@@ -557,7 +499,7 @@
             console.log('[Story] Intro skipped');
             this.isPlayingIntro = false;
             this.currentState = StoryState.INTRO_COMPLETE;
-            const introDiv = document.getElementById('story-intro');
+            const introDiv = document.getElementById('intro-text');  // [SYSTEM_RUNNER_ALERT] Use hardcoded #intro-text
             if (introDiv) {
                 introDiv.style.opacity = '0';
             }
@@ -733,5 +675,19 @@
 
     // Export to window
     window.GameStory = GameStory;
+    
+    // ✅ PHASE 8: Hard-Sync Explicit Exports
+    // Ensure startChapter is callable from window scope immediately
+    if (typeof window.GameStory.startChapter === 'function') {
+        console.log('[SYSTEM_RUNNER_ALERT] ✓ window.GameStory.startChapter ready');
+    } else {
+        console.error('[SYSTEM_RUNNER_ALERT] ❌ window.GameStory.startChapter NOT FOUND');
+        // Fallback: Create an alias if something went wrong
+        if (!window.GameStory.startChapter && GameStory.startChapter) {
+            window.GameStory.startChapter = GameStory.startChapter;
+            console.warn('[SYSTEM_RUNNER_ALERT] Alias created: window.GameStory.startChapter');
+        }
+    }
+    
     console.log('[Story] Module loaded - Story system ready');
 })();

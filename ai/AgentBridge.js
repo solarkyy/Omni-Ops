@@ -725,21 +725,35 @@
             try {
                 const fetches = files.map(async (name) => {
                     const url = `${baseUrl}/${encodeURIComponent(name)}`;
-                    const response = await fetch(url, { cache: 'no-store' });
-                    if (!response.ok) {
-                        throw new Error(`Context fetch failed for ${name}: ${response.status}`);
+                    try {
+                        const response = await fetch(url, { cache: 'no-store' });
+                        // ✅ PHASE 8: Silently skip missing files (404) instead of failing entire batch
+                        if (!response.ok) {
+                            if (CONFIG.devMode) {
+                                console.warn(`[AgentBridge] Context file not found: ${name} (${response.status}), skipping`);
+                            }
+                            return null; // Skip this file
+                        }
+                        const text = await response.text();
+                        const trimmed = text.slice(0, AI_CONTEXT_CONFIG.maxCharsPerFile);
+                        return {
+                            name,
+                            excerpt: trimmed,
+                            truncated: text.length > trimmed.length,
+                            length: text.length
+                        };
+                    } catch (err) {
+                        if (CONFIG.devMode) {
+                            console.warn(`[AgentBridge] Failed to fetch ${name}:`, err.message);
+                        }
+                        return null; // Skip this file on error
                     }
-                    const text = await response.text();
-                    const trimmed = text.slice(0, AI_CONTEXT_CONFIG.maxCharsPerFile);
-                    return {
-                        name,
-                        excerpt: trimmed,
-                        truncated: text.length > trimmed.length,
-                        length: text.length
-                    };
                 });
 
-                const filesData = await Promise.race([Promise.all(fetches), timeoutPromise]);
+                const allResults = await Promise.race([Promise.all(fetches), timeoutPromise]);
+                // Filter out null values (skipped/failed files)
+                const filesData = allResults.filter(f => f !== null);
+                
                 this._aiContextCache = {
                     loadedAt: new Date().toISOString(),
                     files: filesData,

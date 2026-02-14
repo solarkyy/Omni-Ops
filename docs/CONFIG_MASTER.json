@@ -24,15 +24,15 @@
     "network_host": "127.0.0.1"
   },
   "player_start_position": {
-    "x": 100,
+    "x": 0,
     "y": 2,
-    "z": 100
+    "z": 5
   },
   "chapter_1_assets": {
     "_meta": "Phase 7: Genesis - Chapter 1 critical assets for 'Project Ares'. All paths relative to index.html",
     "_theme": "Buffer Zone corruption restoration. Wireframe fallback is cyan with 'CORRUPTED DATA' label.",
     "weapon_rifle": {
-      "primary_model": "models/FpsRig.glb",
+      "primary_model": "https://threejs.org/examples/models/gltf/RobotExpressive/RobotExpressive.glb",
       "fallback_type": "lore_driven_wireframe",
       "fallback_color": "0x00ffff",
       "fallback_label": "CORRUPTED DATA - WEAPON INTEGRITY UNSTABLE",

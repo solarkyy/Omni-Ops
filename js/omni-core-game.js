@@ -150,7 +150,7 @@ const SQUAD_NAMES = ["ALPHA", "BRAVO", "CHARLIE", "DELTA"];
 // --- PLAYER PHYSICS ---
 const player = {
     velocity: new THREE.Vector3(),
-    pitch: 0, yaw: 0, leanFactor: 0,
+    pitch: 0, yaw: Math.PI, leanFactor: 0,
     onGround: false, isSprinting: false, isCrouching: false, isReloading: false, isFiring: false, isAiming: false, adsFactor: 0, 
     ammo: 30, reserveAmmo: 90,
     stamina: 100, isExhausted: false,
@@ -223,183 +223,194 @@ function resolveChapter1SpawnPosition() {
     }
 
     console.warn('[Spawn] Missing Chapter 1 player_start_position in CONFIG_MASTER', { hasChapterConfig: !!chapter });
-    return { x: 0, y: player.eyeLevel ?? 1.6, z: 0 };
+    return { x: 0, y: 2, z: 5 };  // [SYSTEM_RUNNER_ALERT] Teleport fallback - inside level geometry
+}
+
+let chapter1EnvironmentLoaded = false;
+
+function ensureChapter1EnvironmentLoaded() {
+    if (chapter1EnvironmentLoaded) return true;
+    if (!scene) return false;
+
+    const hasChapterRoom = !!scene.children?.some(child => child?.userData?.type === 'chapter1_room');
+    if (hasChapterRoom) {
+        chapter1EnvironmentLoaded = true;
+        return true;
+    }
+
+    if (typeof window.createChapter1StartRoom === 'function') {
+        try {
+            const created = window.createChapter1StartRoom(scene);
+            chapter1EnvironmentLoaded = created !== false;
+            return chapter1EnvironmentLoaded;
+        } catch (err) {
+            console.error('[CoreGame::ensureChapter1EnvironmentLoaded]', err.message);
+            chapter1EnvironmentLoaded = false;
+            return false;
+        }
+    }
+
+    console.warn('[CoreGame] createChapter1StartRoom not available');
+    return false;
+}
+
+function initThreeCore() {
+    console.log('[initThreeCore] Starting...');
+
+    if (!isGameActive) {
+        isGameActive = true;
+    }
+
+    const existingCanvas = document.querySelector('canvas');
+    if (existingCanvas && existingCanvas.id !== 'minimap-canvas') {
+        existingCanvas.parentNode.removeChild(existingCanvas);
+    }
+
+    console.log('[initThreeCore] Creating THREE.Scene...');
+    scene = new THREE.Scene();
+    window.scene = scene;
+
+    console.log('[initThreeCore] Creating camera...');
+    camera = new THREE.PerspectiveCamera(SETTINGS.FOV_BASE, window.innerWidth / window.innerHeight, 0.01, 1000);
+    camera.rotation.order = 'YXZ';
+    camera.position.set(0, 0, 0);
+
+    const playerRig = new THREE.Object3D();
+    const spawnPos = resolveChapter1SpawnPosition();
+    playerRig.position.set(spawnPos.x, spawnPos.y, spawnPos.z);
+    cameraRig = playerRig;
+
+    scene.add(playerRig);
+    playerRig.add(camera);
+    window.camera = camera;
+    window.cameraRig = cameraRig;
+    window.player = player;
+
+    commanderCamera = new THREE.PerspectiveCamera(SETTINGS.FOV_BASE, window.innerWidth / window.innerHeight, 0.01, 1000);
+    commanderCamera.rotation.x = -Math.PI / 2;
+    activeCamera = camera;
+
+    weaponRig = new THREE.Group();
+    camera.add(weaponRig);
+    weaponPivot = new THREE.Group();
+    weaponRig.add(weaponPivot);
+    weaponPivot.position.set(0.2, -0.3, -0.5);
+
+    console.log('[initThreeCore] Creating WebGL renderer...');
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+
+    if (!renderer) {
+        console.error('[initThreeCore] WebGLRenderer failed to initialize');
+        alert('WebGL renderer initialization failed!');
+        throw new Error('WebGL not supported');
+    }
+
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.shadowMap.enabled = SETTINGS.HIFI;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.domElement.style.position = 'absolute';
+    renderer.domElement.style.top = '0';
+    renderer.domElement.style.left = '0';
+    renderer.domElement.style.width = '100%';
+    renderer.domElement.style.height = '100%';
+    renderer.domElement.style.zIndex = '100';
+    renderer.domElement.style.display = 'block';
+
+    document.body.appendChild(renderer.domElement);
+    window.renderer = renderer;
+
+    clock = new THREE.Clock();
+    objects = [];
+    aiUnits = [];
+
+    setupLighting();
+    window.sunLight = sunLight;
+
+    if (window.onGameReady) window.onGameReady();
+
+    setupWeapon();
+
+    window.addEventListener('resize', onResize);
+
+    if (window.SignalBus && typeof window.SignalBus.emit === 'function') {
+        window.SignalBus.emit('scene:ready');
+    }
+
+    window.scene = scene;
+    window.camera = camera;
+    window.cameraRig = cameraRig;
+    window.renderer = renderer;
+    window.THREE = THREE;
+
+    isGameActive = true;
+    gameState.isPaused = false;
+    window.isGameActive = true;
+}
+
+function loadChapter1Environment() {
+    const loaded = ensureChapter1EnvironmentLoaded();
+    if (!loaded) {
+        console.warn('[CoreGame] Chapter 1 environment load skipped');
+    }
+}
+
+function startGameLoop() {
+    if (typeof window.animate === 'function') {
+        window.animate();
+    } else {
+        console.error('[CoreGame::startGameLoop] Animation loop missing', { hasAnimate: typeof window.animate });
+    }
+}
+
+// [SYSTEM_RUNNER_ALERT] Memory-Safe Scene Cleanup - Disposes GPU resources before loading new assets
+function cleanupScene() {
+    if (!scene || !window.THREE) return;
+    
+    console.log('[cleanupScene] Purging legacy scene objects from VRAM...');
+    
+    while(scene.children.length > 0) { 
+        const object = scene.children[0];
+        
+        // Dispose geometry
+        if (object.geometry) {
+            object.geometry.dispose();
+        }
+        
+        // Dispose material(s)
+        if (object.material) {
+            if (Array.isArray(object.material)) {
+                object.material.forEach(mat => {
+                    if (mat.map) mat.map.dispose();
+                    if (mat.normalMap) mat.normalMap.dispose();
+                    if (mat.roughnessMap) mat.roughnessMap.dispose();
+                    if (mat.metalnessMap) mat.metalnessMap.dispose();
+                    mat.dispose();
+                });
+            } else {
+                if (object.material.map) object.material.map.dispose();
+                if (object.material.normalMap) object.material.normalMap.dispose();
+                if (object.material.roughnessMap) object.material.roughnessMap.dispose();
+                if (object.material.metalnessMap) object.material.metalnessMap.dispose();
+                object.material.dispose();
+            }
+        }
+        
+        scene.remove(object); 
+    }
+    
+    console.log('[cleanupScene] Scene purged. VRAM reclaimed.');
 }
 
 function initGame() {
     console.log('[initGame] Starting...');
     try {
-        if (!isGameActive) {
-            isGameActive = true;
-        }
-        const existingCanvas = document.querySelector('canvas');
-        if (existingCanvas && existingCanvas.id !== 'minimap-canvas') existingCanvas.parentNode.removeChild(existingCanvas);
+        // [SYSTEM_RUNNER_ALERT] Memory cleanup BEFORE loading Chapter 1
+        cleanupScene();
         
-        console.log('[initGame] Creating THREE.Scene...');
-        scene = new THREE.Scene();
-        console.log('[World] Scene created');
-        window.scene = scene;
-        
-        // --- TACTICAL DAY ENVIRONMENT (Visual Overhaul) ---
-        // 1. Sky & Fog (Tactical Blue)
-        scene.background = new THREE.Color(0x87CEEB);
-        scene.fog = new THREE.Fog(0x87CEEB, 0, 750);
-        console.log('[Visuals] Tactical blue sky and fog applied');
-        
-        // 2. Lighting (Bright Day)
-        // Remove old lights if necessary to avoid duplication
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-        scene.add(ambientLight);
-        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-        dirLight.position.set(50, 50, 50);
-        dirLight.castShadow = true;
-        scene.add(dirLight);
-        console.log('[Visuals] Bright day lighting initialized');
-        
-        // 3. The Grid Floor (Reference Style)
-        // Replace the dark floor with a lighter tactical grid
-        const grid = new THREE.GridHelper(100, 20, 0x000000, 0x000000);
-        grid.material.opacity = 0.2;
-        grid.material.transparent = true;
-        scene.add(grid);
-        const floorGeo = new THREE.PlaneGeometry(100, 100);
-        const floorMat = new THREE.MeshStandardMaterial({ color: 0xdddddd });
-        const floor = new THREE.Mesh(floorGeo, floorMat);
-        floor.rotation.x = -Math.PI / 2;
-        floor.receiveShadow = true;
-        scene.add(floor);
-        console.log('[Visuals] Tactical grid floor created');
-        
-        // --- END TACTICAL DAY ENVIRONMENT ---
-        
-        // Tactical environment already configured above
-        
-        console.log('[initGame] Creating camera...');
-        camera = new THREE.PerspectiveCamera(SETTINGS.FOV_BASE, window.innerWidth / window.innerHeight, 0.01, 1000);
-        camera.rotation.order = "YXZ"; // ✅ Prevents gimbal lock
-        camera.position.set(0, 0, 0); // Camera at center of player rig
-        
-        // ✅ PLAYER RIG - Replaces cameraRig with Object3D for proper FPS movement
-        const playerRig = new THREE.Object3D();
-        const spawnPos = resolveChapter1SpawnPosition();
-        playerRig.position.set(spawnPos.x, spawnPos.y, spawnPos.z);
-        cameraRig = playerRig; // Keep cameraRig reference for compatibility
-        
-        console.log('[initGame] Player rig positioned at:', playerRig.position);
-        console.log('[initGame] Camera at player center:', camera.position);
-        console.log('[World] Camera initialized with YXZ rotation order');
-        console.log('[World] Player spawned at height 1.6');
-        
-        scene.add(playerRig);
-        playerRig.add(camera);
-        window.camera = camera;
-        window.cameraRig = cameraRig;
-        window.player = player;
-
-        commanderCamera = new THREE.PerspectiveCamera(SETTINGS.FOV_BASE, window.innerWidth / window.innerHeight, 0.01, 1000);
-        commanderCamera.rotation.x = -Math.PI / 2; 
-        
-        activeCamera = camera;
-        
-        // ✅ WEAPON RIG - Enhanced with reference position
-        weaponRig = new THREE.Group(); camera.add(weaponRig);
-        weaponPivot = new THREE.Group(); weaponRig.add(weaponPivot);
-        weaponPivot.position.set(0.2, -0.3, -0.5); // ✅ Adjusted to reference (lower right screen)
-        console.log('[Weapon] Rig initialized at (0.2, -0.3, -0.5)');
-        
-        console.log('[initGame] Creating WebGL renderer...');
-        renderer = new THREE.WebGLRenderer({ antialias: true });
-        
-        // Check for WebGL support and errors
-        if (!renderer) {
-            console.error('[initGame] WebGLRenderer failed to initialize!');
-            alert('WebGL renderer initialization failed!');
-            throw new Error('WebGL not supported');
-        }
-        
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(window.devicePixelRatio);
-        renderer.shadowMap.enabled = SETTINGS.HIFI;
-        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-        renderer.domElement.style.position = 'absolute';
-        renderer.domElement.style.top = '0';
-        renderer.domElement.style.left = '0';
-        renderer.domElement.style.width = '100%';
-        renderer.domElement.style.height = '100%';
-        renderer.domElement.style.zIndex = '100';
-        renderer.domElement.style.display = 'block';
-        
-        console.log('[initGame] Canvas element created, canvas size:', renderer.domElement.width, 'x', renderer.domElement.height);
-        console.log('[initGame] Canvas properties - id:', renderer.domElement.id, 'class:', renderer.domElement.className);
-        
-        document.body.appendChild(renderer.domElement);
-        window.renderer = renderer;
-        
-        console.log('[initGame] Canvas appended to body, checking if visible...');
-        console.log('[initGame] Canvas in DOM:', document.body.contains(renderer.domElement));
-        console.log('[initGame] Canvas computed style - display:', window.getComputedStyle(renderer.domElement).display, 'visibility:', window.getComputedStyle(renderer.domElement).visibility);
-        
-        clock = new THREE.Clock(); objects = []; aiUnits = []; 
-        
-        console.log('[initGame] Setting up lighting...');
-        setupLighting();
-        window.sunLight = sunLight;
-        
-        if (window.GameStory) window.GameStory.startChapter(1);
-        
-        console.log('[initGame] Setting up weapon...');
-        setupWeapon();
-        
-        console.log('[initGame] Initializing living world...');
-        if (window.OMNI_OPS_STORY_MODE === 'CHAPTER1') {
-            console.log('[initGame] Chapter 1 mode active - skipping Living World sandbox population');
-        } else if (window.LivingWorldNPCs) {
-            try { window.LivingWorldNPCs.init(); } catch(e) { console.error('[initGame] Living World init error:', e); }
-        } else {
-            console.warn('[initGame] Living World module not loaded, falling back to zone NPCs');
-            try { spawnZoneNPCs(); } catch(e) { console.error('[initGame] Error spawning zone NPCs:', e); }
-        }
-        
-        console.log('[initGame] Integrating story with world...');
-        if (window.StoryIntegration) {
-            try { window.StoryIntegration.init(); } catch(e) { console.error('[initGame] Story Integration error:', e); }
-        }
-        
-        console.log('[initGame] World generated successfully');
-
-        window.addEventListener('resize', onResize);
-        
-        // --- GLOBAL EXPORTS FOR STORY MODULES ---
-        // ✅ Expose critical systems for Chapter 1 integration bridge
-        window.scene = scene;
-        window.camera = camera;
-        window.cameraRig = cameraRig; // playerRig mapped for compatibility
-        window.renderer = renderer;
-        window.THREE = THREE; // THREE.js library reference
-        console.log('[Core] ✅ Global systems exposed for Chapter 1');
-        console.log('[Core] Exports:', {
-            scene: !!window.scene,
-            camera: !!window.camera,
-            cameraRig: !!window.cameraRig,
-            renderer: !!window.renderer,
-            THREE: !!window.THREE
-        });
-        
-        // ✅ PROJECT ARES PHASE 7: Emit 'scene:ready' signal for NPC spawning
-        // This eliminates the race condition where NPCs spawn before physics initialization
-        if (window.SignalBus && typeof window.SignalBus.emit === 'function') {
-            console.log('[Core] ✅ Emitting scene:ready signal for NPC spawning...');
-            window.SignalBus.emit('scene:ready');
-        } else {
-            console.warn('[Core] SignalBus not available for scene:ready emission');
-        }
-        
-        console.log('[initGame] Animation loop starting');
-        if (typeof window.animate === 'function') {
-            window.animate();
-        } else {
-            console.error('[CoreGame::initGame] Animation loop missing', { hasAnimate: typeof window.animate });
-        }
+        initThreeCore();
+        loadChapter1Environment();
+        startGameLoop();
         
     } catch(err) {
         console.error('[initGame] FATAL ERROR:', err);
@@ -415,37 +426,30 @@ function onSinglePlayerWorldReady() {
     if (singlePlayerWorldReadyHandled) return;
     singlePlayerWorldReadyHandled = true;
 
-    if (window.OMNI_OPS_STORY_MODE === 'CHAPTER1') {
-        console.log('[World] Using OMNI-OPS Chapter 1 start room (sandbox disabled)');
-        if (typeof window.waitForChapter1GameReady === 'function') {
-            window.waitForChapter1GameReady(() => {
-                console.log('[Chapter1] Using Chapter 1 corridor; sandbox disabled');
-                const roomCreated = typeof window.createChapter1StartRoom === 'function'
-                    ? window.createChapter1StartRoom(window.scene)
-                    : false;
+    if (window.OMNI_OPS_STORY_MODE !== 'CHAPTER1') return;
 
-                if (roomCreated) {
-                    const spawnSet = typeof window.setChapter1PlayerSpawn === 'function'
-                        ? window.setChapter1PlayerSpawn(window.player, window.cameraRig)
-                        : false;
+    console.log('[World] Using OMNI-OPS Chapter 1 start room');
+    if (typeof window.waitForChapter1GameReady === 'function') {
+        window.waitForChapter1GameReady(() => {
+            const roomReady = ensureChapter1EnvironmentLoaded();
+            if (!roomReady) return;
 
-                    if (spawnSet) {
-                        // Explicit story startup - orchestrates objectives and VO with clear logging
-                        if (typeof window.initializeChapter1Story === 'function') {
-                            window.initializeChapter1Story();
-                        } else if (window.GameStory && typeof window.GameStory.startChapter === 'function') {
-                            window.GameStory.startChapter(1);
-                        } else {
-                            console.error('[World] Story initialization function not available');
-                        }
-                    }
+            const spawnSet = typeof window.setChapter1PlayerSpawn === 'function'
+                ? window.setChapter1PlayerSpawn(window.player, window.cameraRig)
+                : false;
+
+            if (spawnSet) {
+                if (typeof window.initializeChapter1Story === 'function') {
+                    window.initializeChapter1Story();
+                } else if (window.GameStory && typeof window.GameStory.startChapter === 'function') {
+                    window.GameStory.startChapter(1);
+                } else {
+                    console.error('[World] Story initialization function not available');
                 }
-            });
-        } else {
-            console.error('[World] Chapter 1 integration not ready (waitForChapter1GameReady missing)');
-        }
+            }
+        });
     } else {
-        console.log('[World] Using legacy sandbox world');
+        console.error('[World] Chapter 1 integration not ready (waitForChapter1GameReady missing)');
     }
 }
 
@@ -1564,20 +1568,16 @@ function handleNetworkData(data, senderId) {
     }
 }
 
-// --- WORLD GENERATION (LEGACY) ---
-function generateWorld() {
-    console.warn('[World] Legacy procedural world generation disabled (Chapter 1 only)');
-}
-
 function setupLighting() {
-    // Fable-style ambient lighting
-    scene.add(new THREE.AmbientLight(0xffffff, 1.2));
+    // [SYSTEM_RUNNER_ALERT] Moon Base Atmosphere - "Cold Boot" Environment
+    scene.background = new THREE.Color(0x00050a);  // Deep space black
+    scene.fog = new THREE.FogExp2(0x00050a, 0.02);  // Distant fade
     
-    // Sky to ground hemisphere light for natural outdoor feel
-    scene.add(new THREE.HemisphereLight(0x87ceeb, 0x2d5016, 2.0)); 
+    // [SYSTEM_RUNNER_ALERT] Flashlight Mode - Boost ambient to verify geometry renders
+    scene.add(new THREE.AmbientLight(0xffffff, 1.5));  // Flashlight Mode for visibility
     
-    // Warm directional sun light that changes with time of day
-    sunLight = new THREE.DirectionalLight(0xffdca0, 2.5); 
+    // Harsh directional light (simulating distant star/sun)
+    sunLight = new THREE.DirectionalLight(0xccccff, 1.8); 
     sunLight.position.set(100, 100, 50); 
     sunLight.castShadow = true;
     sunLight.shadow.camera.left = -100; 
@@ -1586,15 +1586,6 @@ function setupLighting() {
     sunLight.shadow.camera.bottom = -100;
     sunLight.shadow.mapSize.set(4096, 4096); 
     scene.add(sunLight);
-    
-    // Ambient point lights for village atmosphere
-    const ambientLight1 = new THREE.PointLight(0xffffff, 1.5, 200);
-    ambientLight1.position.set(40, 60, 40);
-    scene.add(ambientLight1);
-    
-    const ambientLight2 = new THREE.PointLight(0xffffff, 1.5, 200);
-    ambientLight2.position.set(-40, 60, -40);
-    scene.add(ambientLight2);
 }
 
 // ✅ PROJECTILE POOL - For physics-based shots (Reference: ThreeJS_FPS_2.0)
@@ -1632,39 +1623,30 @@ function setupWeapon() {
     window.gunMixer = null; 
     window.gunActions = {};
     
-    // Asset paths (falls back to procedural weapons if loading fails)
-    const weaponModelPath = './models/FpsRig.glb';
+    // Asset paths - ARES Phase 9: CDN-reliable model URL
+    // Using three.js RobotExpressive as standin (known to work, sci-fi enough for sci-fi game)
+    const weaponModelPath = 'https://threejs.org/examples/models/gltf/RobotExpressive/RobotExpressive.glb';
     const fallbackGLTFUrl = 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/DamagedHelmet/glTF/DamagedHelmet.gltf';
-    const maxWeaponLoadRetries = 2;
+    const maxWeaponLoadRetries = 1;
     let weaponLoadAttempts = 0;
     let loader = null;
 
-    // ✅ Initialize GLTFLoader from CDN
-    const initGLTFLoader = () => {
+    // ✅ Initialize GLTFLoader from import map (PHASE 9 Fix)
+    const initGLTFLoader = async () => {
         try {
-            // First, try to load GLTFLoader from unpkg CDN (ESM)
-            const script = document.createElement('script');
-            script.type = 'module';
-            script.textContent = `
-                import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
-                window.GLTFLoaderClass = GLTFLoader;
-            `;
-            document.head.appendChild(script);
-            
-            // Fallback: Check if GLTFLoader already exists from three namespace
-            if (window.THREE && window.THREE.GLTFLoader) {
-                loader = new window.THREE.GLTFLoader();
-                console.log('[Weapon] ✓ GLTFLoader available from THREE namespace');
-                return true;
-            }
-            
-            // Try exposing it manually if Three is already loaded
+            // Use dynamic import from the import map
             if (window.THREE) {
-                console.log('[Weapon] ✓ THREE object available, will attempt GLTF loading');
-                return true;
+                console.log('[Weapon] Loading GLTFLoader from import map...');
+                const GLTFLoaderModule = await import('three/addons/loaders/GLTFLoader.js');
+                const GLTFLoaderClass = GLTFLoaderModule.GLTFLoader;
+                if (GLTFLoaderClass) {
+                    loader = new GLTFLoaderClass();
+                    console.log('[Weapon] ✓ GLTFLoader successfully initialized from import map');
+                    return true;
+                }
             }
         } catch (err) {
-            console.warn('[Weapon] GLTFLoader initialization warning:', err.message);
+            console.warn('[Weapon] GLTFLoader import warning:', err.message);
         }
         return false;
     };
@@ -1770,12 +1752,12 @@ function setupWeapon() {
     };
 
     // ✅ Asset loading logic
-    const loadWeaponModel = () => {
-        // Try to initialize GLTFLoader
-        initGLTFLoader();
+    const loadWeaponModel = async () => {
+        // Try to initialize GLTFLoader (async)
+        const loaderReady = await initGLTFLoader();
 
         // If we have a loader and the model exists, try to load it
-        if (loader) {
+        if (loaderReady && loader) {
             loader.load(weaponModelPath, (gltf) => {
                 const gun = gltf.scene;
                 gun.scale.set(0.08, 0.08, 0.08);
@@ -2101,7 +2083,7 @@ function updateAI(delta) {
         }
     }
     
-    if(sunLight) {
+    if (sunLight) {
         const time = gameState.timeOfDay;
         const alpha = (time / 24) * Math.PI * 2;
         const sunY = Math.sin(alpha - Math.PI/2);
@@ -2109,8 +2091,10 @@ function updateAI(delta) {
         sunLight.position.set(0, sunY * 100, sunZ * 100);
         const intensity = Math.max(0.1, sunY);
         sunLight.intensity = intensity * 1.5;
-        scene.fog.color.setHSL(0.6, 0.2, intensity * 0.1);
-        scene.background.setHSL(0.6, 0.2, intensity * 0.1);
+        if (scene?.fog?.color && scene?.background?.setHSL) {
+            scene.fog.color.setHSL(0.6, 0.2, intensity * 0.1);
+            scene.background.setHSL(0.6, 0.2, intensity * 0.1);
+        }
         const clockEl = document.getElementById('world-clock');
         if(clockEl) {
             clockEl.innerText = `${Math.floor(time).toString().padStart(2,'0')}:${Math.floor((time%1)*60).toString().padStart(2,'0')}`;
@@ -3347,8 +3331,10 @@ function toggleFabricationMode() {
     
     if (window.isFabricationMode) {
         // 1. Apply Cyan Tint (Hologram Effect)
-        scene.fog.color.setHex(0x004444);
-        scene.background.setHex(0x002222);
+        if (scene?.fog?.color && scene?.background?.setHex) {
+            scene.fog.color.setHex(0x004444);
+            scene.background.setHex(0x002222);
+        }
         console.log('[Visuals] Hologram visor activated - Cyan aesthetics applied');
         
         // 2. Spawn Holo-Grid
@@ -3358,15 +3344,19 @@ function toggleFabricationMode() {
             console.log('[Grid] Holographic grid spawned');
         }
         window.editorGrid.visible = true;
-        document.getElementById('hud-visor').style.display = 'block';
+        const hudVisor = document.getElementById('hud-visor');
+        if (hudVisor) hudVisor.style.display = 'block';
     } else {
         // Restore Tactical Day visual theme
-        scene.fog.color.setHex(0x87CEEB);
-        scene.background.setHex(0x87CEEB);
+        if (scene?.fog?.color && scene?.background?.setHex) {
+            scene.fog.color.setHex(0x87CEEB);
+            scene.background.setHex(0x87CEEB);
+        }
         console.log('[Visuals] Tactical theme restored');
         
         if (window.editorGrid) window.editorGrid.visible = false;
-        document.getElementById('hud-visor').style.display = 'none';
+        const hudVisor = document.getElementById('hud-visor');
+        if (hudVisor) hudVisor.style.display = 'none';
     }
 }
 

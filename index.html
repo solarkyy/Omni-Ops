@@ -1,6 +1,16 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+        <!-- [SYSTEM_RUNNER_ALERT] Import Map - Aligns GLTFLoader & core library to prevent diamond dependency -->
+        <script type="importmap">
+            {
+                "imports": {
+                    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+                }
+            }
+        </script>
+
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Omni-Ops | DEFINITIVE EDITION</title>
@@ -57,14 +67,6 @@
         .dialogue-option:hover{background:rgba(0,255,100,0.3);box-shadow:0 0 10px #0f6;transform:translateX(5px)}
         .dialogue-option.selected{background:rgba(0,255,100,0.5);box-shadow:0 0 15px #0f6;border:2px solid #0f6}
     </style>
-
-    <script type="importmap">
-        {
-            "imports": {
-                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
-            }
-        }
-    </script>
 </head>
 <body>
     <div id="loading-screen">
@@ -129,8 +131,11 @@
     </div>
 
     <div id="ui-layer" style="display:none;">
-        <div id="intro-text" style="position:absolute; top:120px; left:50%; transform:translateX(-50%); color:#0f6; font-size:16px; text-align:center; max-width:700px;"></div>
-        <div id="hud-top">
+        <!-- [SYSTEM_RUNNER_ALERT] Story Overlay - HARDCODED DOM STRUCTURE - Exists BEFORE any JS runs -->
+        <div id="story-overlay">
+            <div id="intro-text" style="position:absolute; top:120px; left:50%; transform:translateX(-50%); color:#0f6; font-size:16px; text-align:center; max-width:700px;"></div>
+        </div>
+        <div id="hud-layer">
             <div id="hud-room-id">LOCAL_HOST</div>
             <div id="world-clock" style="margin-top:10px;">00:00</div>
             <div id="connection-status"></div>
@@ -502,6 +507,42 @@
     <script src="ai/ai_worker_api.js" defer></script>
     <!-- TEST HARNESS - Minimal MVP for automated testing (console/external tools only) -->
     <script src="ai/ai_test_harness.js" defer></script>
+    
+    <!-- ✅ PHASE 8: HARD-SYNC ELEMENT VERIFICATION -->
+    <script>
+        window.addEventListener('DOMContentLoaded', () => {
+            console.log('[SYSTEM_RUNNER_ALERT] ========== HARD-SYNC ELEMENT VERIFICATION ==========');
+            
+            const criticalElements = [
+                'intro-text',
+                'dialogue-text',
+                'dialogue-box',
+                'ui-layer',
+                'hud-top',
+                'hud-bottom',
+                'crosshair-container',
+                'menu-overlay'
+            ];
+            
+            let allFound = true;
+            criticalElements.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    console.log(`[SYSTEM_RUNNER_ALERT] ✓ #${id} present in DOM`);
+                } else {
+                    console.error(`[SYSTEM_RUNNER_ALERT] ❌ #${id} MISSING from DOM — story/UI will crash`);
+                    allFound = false;
+                }
+            });
+            
+            if (allFound) {
+                console.log('[SYSTEM_RUNNER_ALERT] ✓ All critical elements verified');
+            } else {
+                console.error('[SYSTEM_RUNNER_ALERT] ❌ MISSING ELEMENTS DETECTED — gameplay will be unstable');
+            }
+        });
+    </script>
+    
     <script>
         // ============================================================================
         // PHASE 3.5 DIAGNOSTIC: Verify Core Game Module and UI Initialization

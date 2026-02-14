@@ -139,13 +139,22 @@
 		},
 
 		createCitizen: function(x, z, faction) {
+			// ✅ PHASE 8: Hard-sync NPC safety guards
 			if (!window.createAIUnit || !window.scene) {
-				console.warn('[Living City] createAIUnit unavailable - aborting citizen spawn');
+				console.warn('[SYSTEM_RUNNER_ALERT] Living City: createAIUnit unavailable - aborting citizen spawn');
 				return null;
 			}
 
 			const citizen = window.createAIUnit(x, z, faction);
-			if (!citizen) return null;
+			if (!citizen) {
+				console.warn('[SYSTEM_RUNNER_ALERT] Living City: createAIUnit returned null');
+				return null;
+			}
+
+			// ✅ PHASE 8: Verify NPC_DATA exists before accessing schedule
+			if (!window.NPC_DATA) {
+				console.warn('[SYSTEM_RUNNER_ALERT] Living City: NPC_DATA not loaded, using fallback schedule');
+			}
 
 			const defaultSchedule = {
 				0: 'sleeping',
@@ -156,9 +165,19 @@
 				18: 'dinner',
 				22: 'sleeping'
 			};
-			const schedule = window.NPC_DATA?.citizen_schedule || defaultSchedule;
 
-			citizen.schedule = schedule;
+			// Safe access with null coalescing
+			const schedule = (window.NPC_DATA && window.NPC_DATA.citizen_schedule) 
+				? window.NPC_DATA.citizen_schedule 
+				: defaultSchedule;
+
+			if (!schedule || typeof schedule !== 'object') {
+				console.error('[SYSTEM_RUNNER_ALERT] Living City: Schedule data corrupted, using fallback');
+				citizen.schedule = defaultSchedule;
+			} else {
+				citizen.schedule = schedule;
+			}
+
 			citizen.activity = 'idle';
 			citizen.home = { x: x, z: z };
 			citizen.workplace = { x: x + Math.random() * 50 - 25, z: z + Math.random() * 50 - 25 };

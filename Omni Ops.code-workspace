@@ -1,0 +1,16 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../../Documentos/GitHub/ThreeJS_FPS_2.0"
+		}
+	],
+	"settings": {
+		"chat.tools.terminal.autoApprove": {
+			"Start-Process": true
+		},
+		"chat.agent.maxRequests": 40
+	}
+}
