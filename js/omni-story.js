@@ -1,6 +1,10 @@
 (function() {
     'use strict';
 
+    const safeText = (el, text) => {
+        if (el) el.innerText = text;
+    };
+
     // ====== LEGACY: FABLE-STYLE STORY & NARRATIVE SYSTEM ======
     // DEPRECATED: This is the original "Heroes of Albion" story mode
     // OMNI-OPS Chapter 1 is now the active story mode
@@ -85,35 +89,54 @@
         introSequence: [
             {
                 phase: 0,
-                duration: 4,
-                text: "THE HEROES OF ALBION",
-                subtitle: "A Tale of Fading Light and Rising Hope",
+                duration: 3,
+                text: "⚡ OMNI-OPS SYSTEM RUNNER",
+                subtitle: "CHAPTER 1: COLD BOOT",
                 camera: { position: [0, 50, -80], lookAt: [0, 5, 0] },
-                bgColor: 0x1a1a2e,
-                textColor: 0xffd700,
+                bgColor: 0x001a33,
+                textColor: 0x00ffcc,
                 effect: "fade_in"
             },
             {
                 phase: 1,
-                duration: 5,
+                duration: 4,
                 narrator: true,
-                text: `"In days of old, heroes walked the earth. They slew dragons, sealed dark gates, 
-                and saved kingdoms with valor and virtue. But all ages end..."`,
+                text: "SYSTEM ALERT: Moon Server Integrity < 40%. The Admin has initiated a sector purge. All non-critical data marked for deletion.",
                 camera: { position: [-40, 30, -50], lookAt: [0, 2, 0] },
-                bgColor: 0x2a2a4a,
+                bgColor: 0x1a0000,
+                textColor: 0xff0000,
                 effect: "pan_slow"
             },
             {
                 phase: 2,
-                duration: 5,
+                duration: 4,
                 narrator: true,
-                text: `"The Age of Heroes faded like starlight at dawn. Magic grew thin. 
-                The old roads fell silent. And in quiet places, new darkness stirred..."`,
+                text: "The Buffer Zone: A decaying digital simulation where corrupted sectors become unstable. Restoration is the only path forward.",
                 camera: { position: [40, 35, -60], lookAt: [0, 2, 0] },
-                bgColor: 0x3a2a1a,
+                bgColor: 0x0a1a2a,
+                textColor: 0x00ffff,
                 effect: "pan_slow"
             },
             {
+                phase: 3,
+                duration: 4,
+                narrator: true,
+                text: "Your mission: Restore critical sectors from wireframe corruption. Turn glitch zones into stable, high-resolution safe zones before The Admin completes the purge.",
+                camera: { position: [40, 35, -60], lookAt: [0, 2, 0] },
+                bgColor: 0x0a2030,
+                textColor: 0x00dd44,
+                effect: "pan_slow"
+            },
+            {
+                phase: 4,
+                duration: 3,
+                text: "SYSTEM RUNNER ID: ARES",
+                subtitle: "Standing by for deployment...",
+                camera: { position: [0, 50, -80], lookAt: [0, 5, 0] },
+                bgColor: 0x001a33,
+                textColor: 0x00ffcc,
+                effect: "fade_in"
+
                 phase: 3,
                 duration: 4,
                 text: "MILLBROOK VILLAGE - Present Day",
@@ -344,7 +367,7 @@
                     cursor: pointer;
                     transition: color 0.3s;
                 `;
-                skipEl.innerText = '[ Press SPACE to skip ]';
+                safeText(skipEl, '[ Press SPACE to skip ]');
                 skipEl.onmouseover = () => skipEl.style.color = '#aaa';
                 skipEl.onmouseout = () => skipEl.style.color = '#666';
                 skipEl.onclick = () => this.skipIntro();
@@ -359,7 +382,7 @@
 
                 // Add CSS animation
                 const style = document.createElement('style');
-                style.innerText = `
+                safeText(style, `
                     @keyframes fadeInUp {
                         from { opacity: 0; transform: translateY(20px); }
                         to { opacity: 1; transform: translateY(0); }
@@ -368,7 +391,7 @@
                         from { opacity: 1; }
                         to { opacity: 0; }
                     }
-                `;
+                `);
                 document.head.appendChild(style);
             }
         },
@@ -379,12 +402,22 @@
             this.introPhase = 0;
             this.introTimer = 0;
 
+            // ✅ AUDIT: Added null guards for menu overlay elements
             const menuOverlay = document.getElementById('menu-overlay');
             const storyIntro = document.getElementById('story-intro');
-            if (menuOverlay) menuOverlay.style.display = 'none';
+            
+            if (menuOverlay) {
+                menuOverlay.style.display = 'none';
+            } else {
+                console.warn('[Story::startIntro] menu-overlay not found, proceeding without hiding');
+            }
+
             if (storyIntro) {
                 storyIntro.style.display = 'flex';
                 storyIntro.style.opacity = '1';
+            } else {
+                console.error('[Story::startIntro] story-intro element missing, cannot start intro');
+                return;
             }
 
             // Input handling
@@ -398,6 +431,28 @@
             this.updateIntro();
         },
 
+        startChapter: function(chapterId) {
+            if (chapterId !== 1) {
+                console.warn('[Story] Unsupported chapter requested:', chapterId);
+                return;
+            }
+
+            window.OMNI_OPS_STORY_MODE = 'CHAPTER1';
+
+            if (this.isPlayingIntro) return;
+
+            if (this.currentState === StoryState.INTRO_COMPLETE) {
+                if (window.launchGame) {
+                    window.launchGame();
+                } else {
+                    console.error('[Story] launchGame not available!');
+                }
+                return;
+            }
+
+            this.startIntro();
+        },
+
         updateIntro: function() {
             if (!this.isPlayingIntro) return;
 
@@ -409,27 +464,34 @@
 
             this.introTimer += 0.016; // ~60fps
 
+            // ✅ AUDIT: Added null guards for all DOM element accesses
             // Update phase content
             const titleEl = document.getElementById('story-title');
             const subtitleEl = document.getElementById('story-subtitle');
             const narrationEl = document.getElementById('story-narration');
 
             if (phase.text && !phase.narrator) {
-                titleEl.innerText = phase.text;
-                titleEl.style.color = phase.textColor ? '#' + phase.textColor.toString(16).padStart(6, '0') : '#ffd700';
-            } else {
+                if (titleEl) {
+                    titleEl.innerText = phase.text;
+                    titleEl.style.color = phase.textColor ? '#' + phase.textColor.toString(16).padStart(6, '0') : '#ffd700';
+                } else {
+                    console.warn('[Story::updateIntro] story-title element missing, skipping text update');
+                }
+            } else if (titleEl) {
                 titleEl.innerText = '';
             }
 
-            if (phase.subtitle) {
+            if (phase.subtitle && subtitleEl) {
                 subtitleEl.innerText = phase.subtitle;
-            } else {
+            } else if (subtitleEl) {
                 subtitleEl.innerText = '';
+            } else if (phase.subtitle) {
+                console.warn('[Story::updateIntro] story-subtitle element missing, cannot display subtitle');
             }
 
-            if (phase.narrator && phase.text) {
+            if (phase.narrator && phase.text && narrationEl) {
                 narrationEl.innerText = phase.text;
-            } else {
+            } else if (narrationEl) {
                 narrationEl.innerText = '';
             }
 
@@ -437,16 +499,24 @@
             const bgColor = phase.bgColor || 0x000000;
             const bgColorHex = '#' + bgColor.toString(16).padStart(6, '0');
             const storyIntro = document.getElementById('story-intro');
-            if (storyIntro) storyIntro.style.background = bgColorHex;
+            if (storyIntro) {
+                storyIntro.style.background = bgColorHex;
+            } else {
+                console.warn('[Story::updateIntro] story-intro element missing, cannot update background');
+            }
 
             // Camera simulation (text animation)
             if (phase.effect === 'fade_in') {
                 const alpha = Math.min(1, this.introTimer / 1);
                 const introContent = document.getElementById('story-intro-content');
-                if (introContent) introContent.style.opacity = alpha;
+                if (introContent) {
+                    introContent.style.opacity = alpha;
+                }
             } else if (phase.effect === 'pan_slow') {
                 const offset = (this.introTimer * 5) % 20;
-                narrationEl.style.opacity = 0.9;
+                if (narrationEl) {
+                    narrationEl.style.opacity = 0.9;
+                }
             }
 
             // Next phase
@@ -567,7 +637,7 @@
                 font-size: 11px;
                 color: #666;
             `;
-            continue_hint.innerText = '[ Press SPACE or CLICK to continue ]';
+            safeText(continue_hint, '[ Press SPACE or CLICK to continue ]');
 
             dialogueBox.appendChild(speaker);
             dialogueBox.appendChild(text);
@@ -588,10 +658,20 @@
             const dialogueBox = document.getElementById('story-dialogue-box');
             const speaker = document.getElementById('story-dialogue-speaker');
             const text = document.getElementById('story-dialogue-text');
+            
+            // ✅ AUDIT: All DOM accesses now guarded with null checks
+            if (!dialogueBox || !speaker || !text) {
+                console.warn('[Story::playDialogueSequence] Dialogue UI missing - elements:', {
+                    dialogueBox: !!dialogueBox,
+                    speaker: !!speaker,
+                    text: !!text
+                });
+                return;
+            }
 
             dialogueBox.style.display = 'block';
-            speaker.innerText = line.speaker;
-            text.innerText = line.text;
+            if (speaker) speaker.innerText = line.speaker || '';
+            if (text) text.innerText = line.text || '';
 
             // Set emotion-based colors
             const emotionColors = {
@@ -608,7 +688,7 @@
                 'mysterious': '#4b0082'
             };
 
-            if (line.emotion && emotionColors[line.emotion]) {
+            if (line.emotion && emotionColors[line.emotion] && speaker) {
                 speaker.style.color = emotionColors[line.emotion];
             }
 
@@ -617,13 +697,17 @@
                 if (e.code === 'Space' || e.type === 'click') {
                     e.preventDefault();
                     document.removeEventListener('keydown', continueHandler);
-                    dialogueBox.removeEventListener('click', continueHandler);
+                    if (dialogueBox) {
+                        dialogueBox.removeEventListener('click', continueHandler);
+                    }
                     this.playDialogueSequence(lines, index + 1);
                 }
             };
 
             document.addEventListener('keydown', continueHandler);
-            dialogueBox.addEventListener('click', continueHandler);
+            if (dialogueBox) {
+                dialogueBox.addEventListener('click', continueHandler);
+            }
         },
 
         getRandomTrivia: function() {

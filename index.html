@@ -129,6 +129,7 @@
     </div>
 
     <div id="ui-layer" style="display:none;">
+        <div id="intro-text" style="position:absolute; top:120px; left:50%; transform:translateX(-50%); color:#0f6; font-size:16px; text-align:center; max-width:700px;"></div>
         <div id="hud-top">
             <div id="hud-room-id">LOCAL_HOST</div>
             <div id="world-clock" style="margin-top:10px;">00:00</div>
@@ -411,6 +412,23 @@
         }
         console.log('[BOOT] ✓ THREE.js loaded successfully (v' + THREE.REVISION + ')');
         window.THREE = THREE; // Ensure global reference
+    </script>
+    
+    <!-- ✅ PROJECT ARES: Load CONFIG_MASTER.json for centralized configuration -->
+    <script>
+        (async function() {
+            try {
+                const response = await fetch('docs/CONFIG_MASTER.json');
+                if (!response.ok) throw new Error(`CONFIG load failed: ${response.status}`);
+                window.CONFIG_MASTER = await response.json();
+                console.log('[BOOT] ✓ CONFIG_MASTER.json loaded');
+                window.CONFIG = window.CONFIG_MASTER; // Alias for compatibility
+            } catch (err) {
+                console.warn('[BOOT] Could not load CONFIG_MASTER.json:', err.message);
+                window.CONFIG_MASTER = { _meta: { error: 'Config load failed' } };
+                window.CONFIG = window.CONFIG_MASTER;
+            }
+        })();
     </script>
     
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>

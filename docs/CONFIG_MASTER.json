@@ -23,6 +23,37 @@
     "http_dev_server": 8000,
     "network_host": "127.0.0.1"
   },
+  "player_start_position": {
+    "x": 100,
+    "y": 2,
+    "z": 100
+  },
+  "chapter_1_assets": {
+    "_meta": "Phase 7: Genesis - Chapter 1 critical assets for 'Project Ares'. All paths relative to index.html",
+    "_theme": "Buffer Zone corruption restoration. Wireframe fallback is cyan with 'CORRUPTED DATA' label.",
+    "weapon_rifle": {
+      "primary_model": "models/FpsRig.glb",
+      "fallback_type": "lore_driven_wireframe",
+      "fallback_color": "0x00ffff",
+      "fallback_label": "CORRUPTED DATA - WEAPON INTEGRITY UNSTABLE",
+      "gltf_loader_source": "https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js"
+    },
+    "workbench_model": "models/chapter1/workbench.glb",
+    "terminal_model": "models/chapter1/terminal.glb",
+    "exit_door_model": "models/chapter1/exit_door.glb",
+    "npc_models": {
+      "citizen_base": "models/chapter1/citizen.glb",
+      "guard_commander": "models/chapter1/commander.glb"
+    },
+    "lore_context": {
+      "chapter_title": "OMNI-OPS SYSTEM RUNNER — CHAPTER 1: COLD BOOT",
+      "setting": "The Buffer Zone (Corrupted Moon Server Sector)",
+      "mission_primary": "Restore corrupted data sectors from wireframe glitch to stable high-res zones",
+      "antagonist": "The Admin (Performing sector-wide purge — Integrity < 40%)",
+      "player_role": "System Runner ID: ARES",
+      "time_pressure": "Moon Server purge in progress. Every sector matters."
+    }
+  },
   "physics": {
     "_note": "Titanium Octree + Fixed Sub-Stepping. SEE: .github/copilot-instructions.md III.A",
     "engine": "Custom Titanium Octree",

@@ -223,7 +223,7 @@ function resolveChapter1SpawnPosition() {
     }
 
     console.warn('[Spawn] Missing Chapter 1 player_start_position in CONFIG_MASTER', { hasChapterConfig: !!chapter });
-    return { x: 0, y: player.eyeLevel ?? 1.6, z: 5 };
+    return { x: 0, y: player.eyeLevel ?? 1.6, z: 0 };
 }
 
 function initGame() {
@@ -345,17 +345,7 @@ function initGame() {
         setupLighting();
         window.sunLight = sunLight;
         
-        console.log('[initGame] Chapter 1 initialization...');
-        if (typeof window.initializeChapter1Story === 'function') {
-            window.initializeChapter1Story();
-        } else if (window.GameStory && typeof window.GameStory.startChapter === 'function') {
-            window.GameStory.startChapter(1);
-        } else {
-            console.error('[initGame] Chapter 1 initializer missing', {
-                hasInit: typeof window.initializeChapter1Story,
-                hasGameStory: !!window.GameStory
-            });
-        }
+        if (window.GameStory) window.GameStory.startChapter(1);
         
         console.log('[initGame] Setting up weapon...');
         setupWeapon();
@@ -394,6 +384,15 @@ function initGame() {
             renderer: !!window.renderer,
             THREE: !!window.THREE
         });
+        
+        // ✅ PROJECT ARES PHASE 7: Emit 'scene:ready' signal for NPC spawning
+        // This eliminates the race condition where NPCs spawn before physics initialization
+        if (window.SignalBus && typeof window.SignalBus.emit === 'function') {
+            console.log('[Core] ✅ Emitting scene:ready signal for NPC spawning...');
+            window.SignalBus.emit('scene:ready');
+        } else {
+            console.warn('[Core] SignalBus not available for scene:ready emission');
+        }
         
         console.log('[initGame] Animation loop starting');
         if (typeof window.animate === 'function') {
@@ -533,7 +532,7 @@ function safeRequestPointerLock() {
             if (e.name === 'SecurityError') {
                 console.log('[PointerLock] SecurityError caught - retrying in 100ms');
                 if (pointerLockRetryTimer) clearTimeout(pointerLockRetryTimer);
-                pointerLockRetryTimer = setTimeout(safeRequestPointerLock, 100);
+                pointerLockRetryTimer = setTimeout(safeRequestPointerLock, SETTINGS.POINTER_LOCK_RETRY_DELAY_MS);
             } else {
                 console.error('[PointerLock] Error:', e.message);
             }
@@ -1633,96 +1632,189 @@ function setupWeapon() {
     window.gunMixer = null; 
     window.gunActions = {};
     
-    // Try to use GLTFLoader if available (requires separate CDN or npm package)
+    // Asset paths (falls back to procedural weapons if loading fails)
+    const weaponModelPath = './models/FpsRig.glb';
+    const fallbackGLTFUrl = 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/DamagedHelmet/glTF/DamagedHelmet.gltf';
+    const maxWeaponLoadRetries = 2;
+    let weaponLoadAttempts = 0;
     let loader = null;
-    try {
-        if (typeof THREE !== 'undefined' && THREE.GLTFLoader) {
-            loader = new THREE.GLTFLoader();
-        } else if (typeof window !== 'undefined' && window.THREE && window.THREE.GLTFLoader) {
-            loader = new window.THREE.GLTFLoader();
-        } else {
-            console.warn('[Visuals] GLTFLoader not available - weapon models will use fallback procedural mesh');
-        }
-    } catch (err) {
-        console.warn('[Visuals] Error initializing GLTFLoader:', err.message);
-    }
-    
-    if (loader) {
-        loader.load('./models/FpsRig.glb', (gltf) => {
-            const gun = gltf.scene;
+
+    // ✅ Initialize GLTFLoader from CDN
+    const initGLTFLoader = () => {
+        try {
+            // First, try to load GLTFLoader from unpkg CDN (ESM)
+            const script = document.createElement('script');
+            script.type = 'module';
+            script.textContent = `
+                import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
+                window.GLTFLoaderClass = GLTFLoader;
+            `;
+            document.head.appendChild(script);
             
-            // Reference Transforms
-            gun.scale.set(0.08, 0.08, 0.08);
-            gun.rotation.set(0, Math.PI / 2, 0); // Correct orientation
-            gun.position.set(0, 0, 0); // Centered in pivot
-            
-            // Add to existing pivot
-            weaponPivot.add(gun);
-            
-            // Setup Animation
-            window.gunMixer = new THREE.AnimationMixer(gun);
-            gltf.animations.forEach((clip) => {
-                window.gunActions[clip.name] = window.gunMixer.clipAction(clip);
-            });
-            
-            // Start Idle
-            if (window.gunActions['Armature|Idle']) {
-                window.gunActions['Armature|Idle'].play();
+            // Fallback: Check if GLTFLoader already exists from three namespace
+            if (window.THREE && window.THREE.GLTFLoader) {
+                loader = new window.THREE.GLTFLoader();
+                console.log('[Weapon] ✓ GLTFLoader available from THREE namespace');
+                return true;
             }
             
-            console.log('[Visuals] AKM Rig Loaded & Animated');
-        }, undefined, (error) => {
-            console.error('[Visuals] Error loading FpsRig.glb:', error);
-            // Fallback to procedural weapon if model not found
-            weaponMesh = new THREE.Group();
+            // Try exposing it manually if Three is already loaded
+            if (window.THREE) {
+                console.log('[Weapon] ✓ THREE object available, will attempt GLTF loading');
+                return true;
+            }
+        } catch (err) {
+            console.warn('[Weapon] GLTFLoader initialization warning:', err.message);
+        }
+        return false;
+    };
+
+    // ✅ Lore-driven fallback: Wireframe mesh labeled "CORRUPTED DATA"
+    const buildCorruptedDataFallback = () => {
+        console.log('[Weapon] Building lore-driven corrupted wireframe fallback...');
+        weaponMesh = new THREE.Group();
+        weaponMesh.name = 'CORRUPTED_DATA_WEAPON';
+
+        // Cyan glitch material (represents corrupted data in the Buffer Zone)
+        const corruptedMaterial = new THREE.MeshPhongMaterial({
+            color: 0x00ffff,
+            emissive: 0x00ffff,
+            wireframe: false,
+            transparent: true,
+            opacity: 0.8
+        });
+
+        const wireframeMaterial = new THREE.MeshPhongMaterial({
+            color: 0x00cc99,
+            wireframe: true,
+            transparent: true,
+            opacity: 0.5
+        });
+
+        // Build corrupted rifle silhouette using cyan primitives
+        const receiver = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.08, 0.25), corruptedMaterial);
+        weaponMesh.add(receiver);
+
+        const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.5, 16), corruptedMaterial);
+        barrel.rotation.x = Math.PI / 2;
+        barrel.position.set(0, 0.01, -0.35);
+        weaponMesh.add(barrel);
+
+        const handguard = new THREE.Mesh(new THREE.BoxGeometry(0.065, 0.07, 0.3), wireframeMaterial);
+        handguard.position.set(0, 0.01, -0.28);
+        weaponMesh.add(handguard);
+
+        const mag = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.15, 0.07), corruptedMaterial);
+        mag.rotation.x = 0.2;
+        mag.position.set(0, -0.1, -0.05);
+        weaponMesh.add(mag);
+
+        const sightBase = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.02, 0.1), wireframeMaterial);
+        sightBase.position.set(0, 0.05, -0.05);
+        weaponMesh.add(sightBase);
+
+        // Muzzle flash (unchanged)
+        muzzleFlashMesh = new THREE.Mesh(new THREE.IcosahedronGeometry(0.1, 0), new THREE.MeshBasicMaterial({ color: 0xffdd00, transparent: true, opacity: 0 }));
+        muzzleFlashMesh.position.set(0, 0.01, -0.65);
+        weaponMesh.add(muzzleFlashMesh);
+
+        muzzleFlashPoint = new THREE.PointLight(0xffaa00, 0, 10);
+        muzzleFlashPoint.position.set(0, 0.01, -0.6);
+        weaponMesh.add(muzzleFlashPoint);
+
+        weaponPivot.add(weaponMesh);
+
+        // Add lore-driven console message
+        console.log('[Weapon] ⚠️ CORRUPTED DATA - Weapon restored to cyan wireframe representation');
+        console.log('[Lore] Buffer Zone sector purge detected. Weapon model integrity < 40%. System Runner must restore data.');
+    };
+
+    // ✅ Standard procedural fallback (if user switches mode)
+    const buildProceduraWeapon = () => {
+        console.log('[Weapon] Building procedural fallback weapon...');
+        weaponMesh = new THREE.Group();
         const darkMetal = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.8, roughness: 0.2 });
         const blackPlastic = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.8 });
-        
+
         const receiver = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.08, 0.25), darkMetal);
         weaponMesh.add(receiver);
-        
+
         const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.5, 16), darkMetal);
         barrel.rotation.x = Math.PI / 2;
         barrel.position.set(0, 0.01, -0.35);
         weaponMesh.add(barrel);
-        
+
         const handguard = new THREE.Mesh(new THREE.BoxGeometry(0.065, 0.07, 0.3), blackPlastic);
         handguard.position.set(0, 0.01, -0.28);
         weaponMesh.add(handguard);
-        
-        const stockStrut = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.2), darkMetal);
-        stockStrut.position.set(0, -0.01, 0.2);
-        weaponMesh.add(stockStrut);
-        
-        const stockButt = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.12, 0.05), blackPlastic);
-        stockButt.position.set(0, -0.02, 0.3);
-        weaponMesh.add(stockButt);
-        
-        const grip = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.12, 0.06), blackPlastic);
-        grip.rotation.x = -0.3;
-        grip.position.set(0, -0.08, 0.05);
-        weaponMesh.add(grip);
-        
+
         const mag = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.15, 0.07), darkMetal);
         mag.rotation.x = 0.2;
         mag.position.set(0, -0.1, -0.05);
         weaponMesh.add(mag);
-        
+
         const sightBase = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.02, 0.1), darkMetal);
         sightBase.position.set(0, 0.05, -0.05);
         weaponMesh.add(sightBase);
-        
+
         muzzleFlashMesh = new THREE.Mesh(new THREE.IcosahedronGeometry(0.1, 0), new THREE.MeshBasicMaterial({ color: 0xffdd00, transparent: true, opacity: 0 }));
-        muzzleFlashMesh.position.set(0, 0.01, -0.65); 
+        muzzleFlashMesh.position.set(0, 0.01, -0.65);
         weaponMesh.add(muzzleFlashMesh);
-        
-        muzzleFlashPoint = new THREE.PointLight(0xffaa00, 0, 10); 
-        muzzleFlashPoint.position.set(0, 0.01, -0.6); 
+
+        muzzleFlashPoint = new THREE.PointLight(0xffaa00, 0, 10);
+        muzzleFlashPoint.position.set(0, 0.01, -0.6);
         weaponMesh.add(muzzleFlashPoint);
-        
+
         weaponPivot.add(weaponMesh);
-        console.log('[Visuals] Fallback procedural weapon loaded');
-    });
+        console.log('[Weapon] ✓ Procedural weapon loaded');
+    };
+
+    // ✅ Asset loading logic
+    const loadWeaponModel = () => {
+        // Try to initialize GLTFLoader
+        initGLTFLoader();
+
+        // If we have a loader and the model exists, try to load it
+        if (loader) {
+            loader.load(weaponModelPath, (gltf) => {
+                const gun = gltf.scene;
+                gun.scale.set(0.08, 0.08, 0.08);
+                gun.rotation.set(0, Math.PI / 2, 0);
+                gun.position.set(0, 0, 0);
+                weaponPivot.add(gun);
+
+                // Setup Animation
+                window.gunMixer = new THREE.AnimationMixer(gun);
+                if (gltf.animations && gltf.animations.length > 0) {
+                    gltf.animations.forEach((clip) => {
+                        window.gunActions[clip.name] = window.gunMixer.clipAction(clip);
+                    });
+                    if (window.gunActions['Armature|Idle']) {
+                        window.gunActions['Armature|Idle'].play();
+                    }
+                }
+
+                console.log('[Weapon] ✓ GLTF Model Loaded & Ready');
+            }, undefined, (error) => {
+                weaponLoadAttempts += 1;
+                console.warn('[Weapon] Asset load attempt', { attempt: weaponLoadAttempts, err: error?.message });
+
+                if (weaponLoadAttempts < maxWeaponLoadRetries) {
+                    setTimeout(loadWeaponModel, 250);
+                    return;
+                }
+
+                // Final fallback: Lore-driven corrupted wireframe
+                console.log('[Weapon] Triggering lore-driven fallback...');
+                buildCorruptedDataFallback();
+            });
+        } else {
+            // No loader? Use lore-driven fallback immediately
+            buildCorruptedDataFallback();
+        }
+    };
+
+    loadWeaponModel();
 }
 
 // --- MINIMAP LOGIC ---
@@ -1929,50 +2021,7 @@ window.createAIUnit = function(x, z, faction) {
 };
 
 function spawnAIUnits() {
-    if (window.OMNI_OPS_STORY_MODE === 'CHAPTER1') {
-        console.log('[World] Skipping spawnAIUnits for Chapter 1 story mode');
-        return;
-    }
-    const offsets = [
-        {x:2, z:12}, {x:-2, z:12}, {x:2, z:14}, {x:-2, z:14}, 
-        {x:2, z:-12}, {x:-2, z:-12}, {x:2, z:-14}, {x:-2, z:-14}, 
-        {x:12, z:2}, {x:12, z:-2}, {x:14, z:2}, {x:14, z:-2}, 
-        {x:-12, z:2}, {x:-12, z:-2}, {x:-14, z:2}, {x:-14, z:-2}
-    ];
-
-    offsets.forEach((pos, idx) => {
-        const ownerIndex = Math.floor(idx / 4);
-        
-        if (lobbySlots[ownerIndex] === null) return;
-
-        const color = PLAYER_COLORS[ownerIndex] || 0x888888;
-        const model = createOperatorModel(color, true); 
-        const group = model.group;
-        
-        const ringGeo = new THREE.RingGeometry(0.5, 0.6, 16);
-        const ringMat = new THREE.MeshBasicMaterial({ color: VISOR_COLORS[ownerIndex] || 0xffffff, side: THREE.DoubleSide, transparent: true, opacity: 0.8 });
-        const ring = new THREE.Mesh(ringGeo, ringMat);
-        ring.rotation.x = -Math.PI/2; ring.position.y = 0.05; ring.visible = false; 
-        group.add(ring);
-
-        group.position.set(pos.x, 0, pos.z);
-        group.userData = { 
-            id: idx, isAI: true, owner: ownerIndex,
-            faction: FACTIONS.SQUAD,
-            status: 'FRIENDLY',
-            health: 100,
-            job: JOBS.NONE
-        }; 
-        scene.add(group);
-        
-        aiUnits.push({
-            id: idx, mesh: group, model: model, ring: ring,
-            navTarget: null, serverPos: null, state: STATES.IDLE, moveSpeed: 6, walkCycle: 0,
-            userData: group.userData,
-            homePos: new THREE.Vector3(pos.x, 0, pos.z),
-            lastShotTime: 0
-        });
-    });
+    console.warn('[World] spawnAIUnits legacy call ignored (LivingWorld owns NPC spawns)');
 }
 
 function spawnZoneNPCs() {
@@ -2804,8 +2853,9 @@ function animate() {
     
     // ✅ Safety Net: Prevent player from falling into the void
     if (cameraRig && cameraRig.position.y < -5) {
-        console.warn('[Physics] Player fell below world - teleporting to spawn (0, 1.6, 5)');
-        cameraRig.position.set(0, 1.6, 5);
+        const respawnPos = resolveChapter1SpawnPosition();
+        console.warn('[Physics] Player fell below world - teleporting to spawn', respawnPos);
+        cameraRig.position.set(respawnPos.x, respawnPos.y, respawnPos.z);
         player.velocity.set(0, 0, 0);
         if (window.updateDialogue) {
             window.updateDialogue('SYSTEM: Position reset. Falling damage avoided.');
@@ -3364,8 +3414,7 @@ window.editorRegenWorld = function() {
     if (!scene) return;
     objects.forEach(o => { if (o.userData && !o.userData.player) scene.remove(o); });
     objects = objects.filter(o => !o.userData || o.userData.player);
-    generateWorld(gameState.worldSeed);
-    console.log('[Editor] Regenerated world');
+    console.warn('[Editor] Legacy world regeneration disabled (Chapter 1 only)');
 };
 
 window.editorSetTime = function(hour) {
@@ -3994,5 +4043,4 @@ window.updateDialogue = function(text) {
     }
 };
 
-} // ← Added missing closing brace for unclosed block
 })(); // CLOSE THE IIFE - CRITICAL!
